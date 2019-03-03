@@ -29,7 +29,8 @@ float CMover::GetMPRatio() {
 
 to
 
-```cppfloat CMover::GetHPRatio() {
+```cpp
+float CMover::GetHPRatio() {
 	JOB_RATIO(2.0f,  JOB_KNIGHT);
 	JOB_RATIO(1.8f,  JOB_BILLPOSTER);
 	JOB_RATIO(1.6f,  JOB_RINGMASTER);
