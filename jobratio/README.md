@@ -29,6 +29,28 @@ float CMover::GetMPRatio() {
 
 to
 
-```cpp
-TODO
+```cppfloat CMover::GetHPRatio() {
+	JOB_RATIO(2.0f,  JOB_KNIGHT);
+	JOB_RATIO(1.8f,  JOB_BILLPOSTER);
+	JOB_RATIO(1.6f,  JOB_RINGMASTER);
+	JOB_RATIO(1.6f,  JOB_JESTER);
+	JOB_RATIO(1.6f,  JOB_RANGER);
+	JOB_RATIO(1.6f,  JOB_BLADE);
+	JOB_RATIO(1.5f,  JOB_MERCENARY);
+	JOB_RATIO(1.5f,  JOB_ELEMENTOR);
+	JOB_RATIO(1.5f,  JOB_PSYCHIKEEPER);
+
+	return (m_nJob != JOB_VAGRANT) ? 1.4f : 0.8f;
+}
+
+float CMover::GetMPRatio() {
+	JOB_RATIO(2.0f,  JOB_ELEMENTOR);
+	JOB_RATIO(2.0f,  JOB_PSYCHIKEEPER);
+	JOB_RATIO(1.8f,  JOB_RINGMASTER);
+	JOB_RATIO(1.3f,  JOB_ASSIST);
+	JOB_RATIO(0.6f,  JOB_KNIGHT);
+	JOB_RATIO(0.6f,  JOB_BLADE);
+
+	return (m_nJob != JOB_VAGRANT) ? 0.5f : 0.3f;
+}
 ```
