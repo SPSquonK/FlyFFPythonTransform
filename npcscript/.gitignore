@@ -1,4 +1,10 @@
 # ZA WARUUUDOOOO ダイアログ ドツ テイクステ
 WorldDialog.txt
+
+# Output
+index.txt
 NpcOutputWithDial.txt
 WorldDialogUnused.txt
+
+# Actual result
+NPCSQKDialog.txt

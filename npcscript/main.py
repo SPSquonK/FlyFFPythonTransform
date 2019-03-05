@@ -13,9 +13,9 @@ def normalize(line):
     return line.strip().replace(chr(10), "").replace("\r", "")
 
 
-
 for line in content:
     res = re.search('void CNpcScript::(.*)_([0-9]*)\\(\\)', line)
+    
     
     if res:
         lastNPC = str(res.group(1))
@@ -24,15 +24,15 @@ for line in content:
             result[lastNPC] = []
             
     else:
-        res = re.search('Speak\(\s*NpcId\(\)\s*,\s*([0-9]*)\s*\);', line)
+        res = re.search('Speak\s*\(\s*NpcId\(\)\s*,\s*([0-9]*)\s*\);', line)
         
         if res:
             result[lastNPC].append({ 'ID': lastId, 'type': 'Speak', 'dial' : int(res.group(1)) })
         else:
-            res = re.search('Say\(\s*([0-9]*)\s*\);', line)
+            res = re.search('Say\s*\(\s*([0-9]*)\s*\);', line)
             if res:
                 result[lastNPC].append({ 'ID': lastId, 'type': 'Say', 'dial' : int(res.group(1)) })
-        
+            
     
 
 s = []
@@ -51,9 +51,14 @@ f.close()
 
 zawarudo = []
 
+z = open("index.txt", "w+")
+
+i = 0
 with open("WorldDialog.txt") as f:
     for line in f.readlines():
         zawarudo.append({'txt':normalize(line), 'used': False})
+        z.write(str(i) + ";;;" + normalize(line) + "\n")
+        i = i + 1
 
 
 for npcname, npc in result.items():
@@ -79,6 +84,36 @@ for line in zawarudo:
     if not line['used']:
         f.write(line['txt'])
         f.write("\n")
+    
+    
+f = open("NPCSQKDialog.txt", "w+")
+for npcname, npc in result.items():    
+    if not npc:
+        continue
+    
+    f.write("/* " + npcname + "*/ \n")
+    
+    s = False
+    
+    for dic in npc:
+        if dic['type'] == 'Speak':
+            if not s:
+                f.write("// Speak\n")
+                s = True
+            
+            f.write(dic['dialtxt']+ "\n")
+    
+    
+    s = False
+    
+    for dic in npc:
+        if dic['type'] == 'Say':
+            if not s:
+                f.write("// Say\n")
+                s = True
+            
+            f.write(dic['dialtxt']+ "\n")
+    
     
     
     
