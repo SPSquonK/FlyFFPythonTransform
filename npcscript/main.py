@@ -91,7 +91,7 @@ for npcname, npc in result.items():
     if not npc:
         continue
     
-    f.write("/* " + npcname + "*/ \n")
+    f.write("/* " + npcname + " */\n")
     
     s = False
     
