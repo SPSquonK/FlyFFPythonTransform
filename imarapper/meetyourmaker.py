@@ -2,17 +2,23 @@ import re
 
 ## Load ITEM
 items = []
-with open("weaponsid.txt") as f:
+with open("propItem.txt") as f:
     for line in f.readlines():
-        items.append(line.replace(chr(10), "").replace("\r", "").lower())
+        is_yoyo = line.find("IK3_YOYO")
+        
+        if is_yoyo == -1:
+            continue
+        
+        items.append(re.search("[0-9]*\\s*([a-zA-Z_0-9]*)\\s*", line).group(1))
 
+print(items)
 
 foundyoyomodel = {}
 
 # Determine which sfx we need
 with open("mdlDyna.inc") as f:
     for m in f.readlines():
-        regex_search = re.search("\"([a-zA-Z_]*)\"\\s*([a-zA-Z_]*)\\s*.*", m)
+        regex_search = re.search("\"([a-zA-Z_0-9]*)\"\\s*([a-zA-Z_0-9]*)\\s*.*", m)
         
         if not regex_search:
             continue
@@ -20,12 +26,16 @@ with open("mdlDyna.inc") as f:
         identifier = regex_search.group(2).lower()
         
         if identifier in items:
-            foundyoyomodel[model] = False
+            if foundyoyomodel.has_key(model):
+                foundyoyomodel[model]['items'].append(identifier)
+            else:
+                foundyoyomodel[model] = { 'checked' : False, 'items' : [identifier] }
+            
 
 
 with open("mdlDyna.inc") as f:
     for m in f.readlines():
-        regex_search = re.search("\"([a-zA-Z_]*)\"\\s*([a-zA-Z_]*)\\s*.*", m)
+        regex_search = re.search("\"([a-zA-Z_0-9]*)\"\\s*([a-zA-Z_0-9]*)\\s*.*", m)
         
         if not regex_search:
             continue
@@ -34,14 +44,39 @@ with open("mdlDyna.inc") as f:
         
         if identifier.startswith("xi_item_"):
             if model[0:4] == 'sfx_' and foundyoyomodel.has_key(model[4:]):
-                foundyoyomodel[model[4:]] = True
+                foundyoyomodel[model[4:]]['checked'] = True
 
 
 for k, v in foundyoyomodel.items():
-    if not v:
-        print(k)
+    if not v['checked']:
+        print("Item_" + k + ".o3d" + "       " + k + "        " + "sfx_" + k)
+
+print
+print
+
+for k, v in foundyoyomodel.items():
+    if not v['checked']:
+        print("\t\"sfx_" + k + "\"\t XI_ITEM_YOYO_ATK" + k[6:].upper() + "\tMODELTYPE_SFX \"\" 0  MD_NEAR 0  1.0f 0 1 ATEX_NONE 1")
+
+print
+print
+
+for k, v in foundyoyomodel.items():
+    if not v['checked']:
+        print("#define XI_ITEM_YOYO_ATK" + k[6:].upper() + " 0")
+
+
+print
+print
+
+for k, v in foundyoyomodel.items():
+    if not v['checked']:
+        for i in v['items']:
+            print(i.upper() + " -> XI_ITEM_YOYO_ATK" + k[6:].upper())
+
 
 '''
+"sfx_weayoyaquabr"	    XI_ITEM_YOYO_ATK15			MODELTYPE_SFX "" 0  MD_NEAR 0  1.0f 0 1 ATEX_NONE 1
 
 ## SFX FILE MODEL
 # Load sfx, get static part of yoyo sfx
