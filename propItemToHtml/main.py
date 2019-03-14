@@ -23,7 +23,7 @@ def add_types(dict, list):
         dict[item] = []
 
 
-add_types(weapons_type, ['IK3_SWORD', 'IK3_AXE', 'IK3_CHEERSTICK', 'IK3_KNUCKLEHAMMER', 'IK3_WAND', 'IK3_STAFF', 'IK3_YOYO', 'IK3_BOW', 'IK3_CROSSBOW', 'IK3_SHIELD', 'IK3_MAGICBARUNA', 'IK3_ZEMBARUNA', 'IK3_SHILDBARUNA'])  # rip flake or whatever tool i used for python code normalization lol
+add_types(weapons_type, ['IK3_SWD', 'IK3_AXE', 'IK3_CHEERSTICK', 'IK3_KNUCKLEHAMMER', 'IK3_WAND', 'IK3_STAFF', 'IK3_YOYO', 'IK3_BOW', 'IK3_CROSSBOW', 'IK3_SHIELD', 'IK3_MAGICBARUNA', 'IK3_ZEMBARUNA', 'IK3_SHILDBARUNA'])  # rip flake or whatever tool i used for python code normalization lol
 
 
 POS_WEAPON_NAME = 2
@@ -198,26 +198,13 @@ html_file = ""
 
 j2_env = Environment(loader=FileSystemLoader(THIS_DIR), trim_blocks=True)
 
-template = j2_env.get_template('template.htm')
-
-
-
-
-with open("template_begin.htm") as f:
-    for line in f.readlines():
-        html_file += "\r\n" + line
-
-
+ijustwanttobreaktherules = ""
 for weapon_type in weapons_type:
-    html_file += "\r\n" + template.render(weaponname=weapon_type, weapons=serialize(weapons_type[weapon_type]))
+    ijustwanttobreaktherules += "\r\n" + j2_env.get_template('template.htm').render(weaponname=weapon_type, weapons=serialize(weapons_type[weapon_type]))
 
-
-with open("template_end.htm") as f:
-    for line in f.readlines():
-        html_file += "\r\n" + line
-
+content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
 
 
 f = open("itemlist.html", "w+")
-f.write(html_file)
+f.write(content)
 f.close()
