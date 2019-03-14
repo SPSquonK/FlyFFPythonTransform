@@ -33,6 +33,7 @@ POS_HANDED = 16
 POS_DWPARAM = 53
 POS_ADJPARAM = 53 + number_of_parameters
 POS_SZICON = 132 - (6 - number_of_parameters) * 4
+POS_LEVEL = POS_SZICON - 4  # I'm lazy
 
 if path[-1] != '\\':
     path = path + '\\'
@@ -69,7 +70,7 @@ with open(path + propItem_filename, encoding="ansi") as f:
             'JOB': parameters_list[POS_JOB],
             'DOUBLE_HANDED': parameters_list[POS_HANDED] == 'HD_TWO',
             'ICON_IMAGE': parameters_list[POS_SZICON].replace("\"", ""),
-            'Level': 1,
+            'Level': 0 if parameters_list[POS_LEVEL] == "=" else int(parameters_list[POS_LEVEL]),
             'Bonus': bonus
         })
         
@@ -109,19 +110,60 @@ def replace_txt(identifier, text):
 read_text_file(path + "propItem.txt.txt", replace_txt)
 
 # Detect tid_tooltip name
+
 tooltips = {}
+tooltips_rate = {}
+
+import re
+
+with open(path + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as f:
+    mode = 0
+    for line in f.readlines():
+        line = line.strip()
+        if mode == 0:
+            if line.startswith("static DST_STRING g_DstString[] ="):
+                mode = 1
+            elif line.startswith("static constexpr int nDstRate[] = {"):
+                mode = 2
+        else:
+            if line == "};":
+                mode = 0
+            else:
+                if mode == 1:
+                
+                    m = re.findall("(DST_[A-Z_]*)\s*,\s*([A-Z_]*)", line)
+                    
+                    if m is not None:
+                        print(m)
+                
+                else :
+                    m = re.findall("(DST_[A-Z_]*)", line)
+                    if m is not None:
+                        print(m)
+                    
+                    
+        
+        
+        
+
+
 mode = 0
 with open(path + "textClient.inc", encoding="utf-16-le") as f:
     for line in f.readlines():
         if mode == 0:
-            if line.startswith("TID_TOOLTIP_"):
-                space_pos = line.find("0x")
-                tooltip = line[len("TID_TOOLTIP_"):space_pos].strip()
-                mode = 1
+            space_pos = line.find("0x")
+            tooltip = line[len("TID_TOOLTIP_"):space_pos].strip()
+            
+            for t in tooltips:
+                if tooltips[t] == tooltip:
+                    tooltip_id = t
+                    mode = 1
+                    break
+            
         elif mode == 1:
             mode = 2
         else:
-            tooltips[tooltip] = line.strip()
+            tooltips[tooltip_id] = line.strip()
             mode = 0
     
     
@@ -132,6 +174,7 @@ def replace_tooltip(identifier, text):
             
 read_text_file(path + "textClient.txt.txt", replace_tooltip)
 
+print(tooltips)
 
 def set_bonus_name(weapon):
     weapon['Bonus_Serialization'] = []
@@ -177,7 +220,13 @@ for_each_weapon(compute_icon)
 def serialize(weapon_type):
     dict = []
     
-    for w in weapon_type:
+    
+    def keycomparator(w):
+        return (w['DOUBLE_HANDED'], w['Level'], w['JOB'], w['WEAPON_NAME'])
+    
+    weapons = sorted(weapon_type, key=keycomparator)
+    
+    for w in weapons:
         dict.append({
             'icon': w['image_path'],
             'name': w['WEAPON_NAME'],
