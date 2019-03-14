@@ -66,6 +66,7 @@ with open(path + propItem_filename, encoding="ansi") as f:
             bonus.append((bonus_type, bonus_quantity))
         
         weapons_type[weapon_type].append({
+            'ID': parameters_list[1],
             'TXT_NAME': parameters_list[POS_WEAPON_NAME],
             'JOB': parameters_list[POS_JOB],
             'DOUBLE_HANDED': parameters_list[POS_HANDED] == 'HD_TWO',
@@ -251,7 +252,7 @@ def value_of_job(job_name):
 
 
 def weapon_comparator(w):
-    return (w['DOUBLE_HANDED'], value_of_job(w['JOB']), w['Level'], w['WEAPON_NAME'])
+    return (w['DOUBLE_HANDED'], value_of_job(w['JOB']), w['OldLevel'], w['WEAPON_NAME'])
 
 def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
     if w['JOB'].find("_MASTER") != -1 or w['JOB'].find("_HERO") != -1:
@@ -262,7 +263,8 @@ def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
             index = list.index(w['JOB'])
             w['JOB'] = jobs_values[0][index + 5]
             break
-
+    w['OldLevel'] = w['Level']
+    
     if w['Level'] <= 15:
         w['Level'] = 1
     elif w['Level'] < 60:
@@ -309,6 +311,27 @@ for weapon_type in weapons_type:
                                         .render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]))
 
 content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
+
+
+if True:
+    f = open("items.csv", "w+")
+    
+    def weapon_comparator2(w):
+        return (w['OldLevel'], list(w['WEAPON_NAME']).reverse())
+    
+    sss = []
+    for t in weapons_type:
+        for w in weapons_type[t]:
+            sss.append(w)
+    
+    
+    for w in sorted(sss, key=weapon_comparator2):
+        f.write("\t".join([w['ID'], w['WEAPON_NAME'], str(w['Level']), str(w['OldLevel']), w['JOB'], ';'.join(w['Bonus_Serialization'])]) + "\n")
+    
+    f.close()
+    
+    
+    
 
 
 f = open("itemlist.html", "w+")
