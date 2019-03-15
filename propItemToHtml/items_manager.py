@@ -7,6 +7,7 @@ from collections import OrderedDict
 NUMBER_OF_PARAMS = 6
 ITEM_MANAGER = None
 
+ITEM_REGEX = "([A-Za-z0-9_]+)"
 
 # Gives the right item manager to your number of parameters. You can not store it, as it will be
 # reminded by other functions, but you need to call it once if your number of dw param is different than 6
@@ -62,6 +63,7 @@ def decrypt_item(line, item_manager=ITEM_MANAGER):
     return {
         'ID': parameters_list[item_manager['ID']],
         'TXT_NAME': parameters_list[item_manager['IDS_WEAPON_NAME']],
+        'IK3': parameters_list[item_manager['IK3']],
         'JOB': parameters_list[item_manager['JOB']],
         'DOUBLE_HANDED': parameters_list[item_manager['DOUBLE_HANDED']] == 'HD_TWO',
         'ICON_IMAGE': parameters_list[item_manager['SZICON']].replace("\"", ""),
