@@ -3,6 +3,7 @@
 <table>
     <tr>
         <td>Icone</td>
+        <td>ID</td>
         <td>Nom</td>
         <td>Classe</td>
         <td>Niveau</td>
@@ -11,6 +12,7 @@
     {% for weapon in weapons %}
     <tr>
         <td><img src="{{ weapon.icon }}"></td>
+        <td>{{ weapon.id }}</td>
         <td>{{ weapon.name }}</td>
         <td>{{ weapon.job }}</td>
         <td>{{ weapon.level }}</td>

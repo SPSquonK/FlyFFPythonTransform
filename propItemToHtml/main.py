@@ -284,6 +284,7 @@ def serialize(weapon_type):
     for w in weapons:
         dict.append({
             'icon': w['image_path'],
+            'id': w['ID'],
             'name': w['WEAPON_NAME'],
             'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
             'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
