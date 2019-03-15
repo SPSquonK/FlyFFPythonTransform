@@ -52,8 +52,8 @@ def decrypt_item(line, item_manager=ITEM_MANAGER):
     
     bonus = []
     for i in range(item_manager['LEN_DW_PARAM']):
-        bonus_type = parameters_list[item_manager['START_DW_PARAM'] + i]
-        bonus_quantity = parameters_list[item_manager['START_ADJ_PARAM'] + i]
+        bonus_type = parameters_list[item_manager['START_DW_PARAM'] + i].strip()
+        bonus_quantity = parameters_list[item_manager['START_ADJ_PARAM'] + i].strip()
         
         if bonus_type == "=":
             continue

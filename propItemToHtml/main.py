@@ -7,9 +7,22 @@ import os
 
 import items_manager
 
-path = "..\\..\\FlyFF-VS17\\Resource\\" if len(sys.argv) < 2 else sys.argv[1]
-propItem_filename = "propItem.txt" if len(sys.argv) < 3 else sys.argv[2]
-number_of_parameters = 6 if len(sys.argv) < 4 else sys.argv[3]
+js = False
+
+args = []
+args.extend(sys.argv)
+
+if len(args) >= 2 and args[1] == "JS":
+    js = True
+    print("JS activated")
+    for i in range(len(args) - 1):
+        args[i] = args[i + 1]
+    args.pop(len(args) - 1)
+
+
+path = "..\\..\\FlyFF-VS17\\Resource\\" if len(args) < 2 else args[1]
+propItem_filename = "propItem.txt" if len(args) < 3 else args[2]
+number_of_parameters = 6 if len(args) < 4 else args[3]
 
 weapons_type = OrderedDict()
 
@@ -172,6 +185,7 @@ def set_bonus_name(weapon):
             bonus_type_serialized = tooltips[bonus_type]
         else:
             bonus_type_serialized = bonus_type
+            tooltips[bonus_type] = bonus_type
 
         percent_mark = "%" if bonus_type in tooltips_rate else ""
 
@@ -242,11 +256,35 @@ def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
 
 for_each_weapon(legendary_emerald_volcano_terra_sun_zero_flyff_adjustements)
 
-def serialize(weapon_type):
+
+def serialize_js(weapon_type):
     dict = []
-    
+
     weapons = sorted(weapon_type, key=weapon_comparator)
+
+    for w in weapons:
+        bonuss = []
+        bonuss.extend(w['Bonus'])
+        while len(bonuss) != number_of_parameters:
+            bonuss.append(("=", 0))
     
+        dict.append({
+            'icon': w['image_path'],
+            'id': w['ID'],
+            'name': w['WEAPON_NAME'],
+            'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
+            'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
+            'bonus': '<br>'.join(w['Bonus_Serialization']),
+            'bonuss': bonuss
+        })
+        
+    return dict
+
+def serialize_no_js(weapon_type):
+    dict = []
+
+    weapons = sorted(weapon_type, key=weapon_comparator)
+
     for w in weapons:
         dict.append({
             'icon': w['image_path'],
@@ -258,7 +296,20 @@ def serialize(weapon_type):
         })
         
     return dict
+
+bonustypes = []
+
+if js:
+    serialize = serialize_js
     
+    bonustypes.append({ 'DST': '=', 'Name': '' })
+    for t in tooltips:
+        bonustypes.append({'DST': t, 'Name': tooltips[t]})
+    
+    template = 'template_js.htm'
+else:
+    serialize = serialize_no_js
+    template = 'template.htm'
 
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -266,21 +317,39 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 html_file = ""
 
-
 j2_env = Environment(loader=FileSystemLoader(THIS_DIR), trim_blocks=True)
 
 ijustwanttobreaktherules = ""
-for weapon_type in weapons_type:
+
+
+
+
+def generate_templated_page(weapon_type, template_page):
     weapon_dscr = weapon_type + " " + str(len(weapons_type[weapon_type])) + " weapons"
 
-    ijustwanttobreaktherules += "\r\n"\
-                                + j2_env.get_template('template.htm')\
-                                        .render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]))
-
-content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
+    return "\r\n" + j2_env.get_template(template).render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]), bonustypes=bonustypes, nbparam=number_of_parameters)
 
 
-if True:
+def generate_general_page(ijustwanttobreaktherules, page_name="itemlist.html"):
+    content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
+    f = open(page_name, "w+")
+    f.write(content)
+    f.close()
+
+if js:
+    for weapon_type in weapons_type:
+        ijustwanttobreaktherules = generate_templated_page(weapon_type, template)
+        generate_general_page(ijustwanttobreaktherules, "item_list_" + weapon_type + ".htm")
+else:
+    ijustwanttobreaktherules = ""
+    for weapon_type in weapons_type:
+        ijustwanttobreaktherules += generate_templated_page(weapon_type, template)
+    generate_general_page(ijustwanttobreaktherules)
+
+
+
+
+if False:
     f = open("items.csv", "w+")
     
     def weapon_comparator2(w):
@@ -300,7 +369,3 @@ if True:
     
     
 
-
-f = open("itemlist.html", "w+")
-f.write(content)
-f.close()
