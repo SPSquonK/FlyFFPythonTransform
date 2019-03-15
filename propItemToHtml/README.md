@@ -35,12 +35,33 @@ This system should also work with other items
 The new propItem will be written as a file named `newPropItem.txt``
 
 
+## modify_bonus.py
+
+Reads changed_bonus.txt and apply its change to propItem
+
+changed_bonus.txt is the file you should create by :
+- calling `python main.py JS`
+- change the bonus of the weapons to whatever you like
+- copy the content of the textarea at the bottom of the page in the changed_bonus.txt file
+
+The results is a new propItem.txt file is this directory which is the same as the source, but with the new bonus applied.
+
+It makes easier to modify bonus without the hassle of remembering DST names and modifying weapons dissiminated in a file.
+
 ## Usage
 
 `python main.py /path/to/resource/folder NameOfYourPropItemFile NumberOfParameters(3 by default)`
 
 Check the first lines of the py file to modify the base values.
 
+By using JS as the first argument of `python main.py`, it will generate html files for every 
+
 ## Requirements
 
 Jinja2 is used to generate the pages : `pip install Jinja2`
+
+## Licence
+
+This subproject uses JQuery 3.3.1 which is distributed under the MIT Licence. You can read its licence here : https://jquery.org/license
+
+Everything else is distributed with the same licence as other subprojects of this repo

@@ -304,7 +304,9 @@ if js:
     
     bonustypes.append({ 'DST': '=', 'Name': '' })
     for t in tooltips:
-        bonustypes.append({'DST': t, 'Name': tooltips[t]})
+        percent = " (%)" if t in tooltips_rate else ""
+    
+        bonustypes.append({'DST': t, 'Name': tooltips[t] + percent})
     
     template = 'template_js.htm'
 else:
