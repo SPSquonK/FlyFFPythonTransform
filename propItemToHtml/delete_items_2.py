@@ -7,20 +7,15 @@ import os
 import items_manager
 
 
-path = "..\\..\\FlyFF-VS17\\Resource\\" if len(sys.argv) < 2 else sys.argv[1]
-propItem_filename = "propItem.txt" if len(sys.argv) < 3 else sys.argv[2]
-number_of_parameters = 6 if len(sys.argv) < 4 else sys.argv[3]
-
-
-item_manager = items_manager.get_item_manager(number_of_parameters)
-item_list = items_manager.get_item_list(path + propItem_filename)
+item_manager = items_manager.get_item_manager()
+item_list = items_manager.get_item_list()
 
 
 # Read items to delete
 items_to_remove = []
 
 
-with open("items_to_remove.txt") as f:
+with open(items_manager.THIS_DIR + "items_to_remove.txt") as f:
     for line in f.readlines():
         line = line.strip()
         if line is None or len(line) == 0:
@@ -34,8 +29,6 @@ with open("items_to_remove.txt") as f:
 
 delete_items = []
 rewritten_bonus = {}
-
-
         
 for item_to_remove in items_to_remove:
     delete_items.append(item_to_remove[0])
@@ -47,13 +40,9 @@ for item_to_remove in items_to_remove:
         bonus.extend(item_list[item_to_remove[0]]['Bonus'])
         rewritten_bonus[item_to_remove[1]] = bonus
 
-
-
-
-
 new_propItemContent = []
 
-with open(path + propItem_filename, encoding="ansi") as f:
+with open(items_manager.modifiedPropItem(), encoding="ansi") as f:
     for line in f.readlines():    
         origline = line
         line = line.replace(str(chr(10)), "").replace("\r", "").strip()
@@ -88,6 +77,6 @@ with open(path + propItem_filename, encoding="ansi") as f:
         new_propItemContent.append("\t".join(parameters_list))
 
 
-f = open(path + propItem_filename, "w+", encoding="ansi")
+f = open(items_manager.modifiedPropItem(), "w+", encoding="ansi")
 f.write("\n".join(new_propItemContent))
 f.close()

@@ -305,9 +305,6 @@ j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_block
 
 ijustwanttobreaktherules = ""
 
-
-
-
 def generate_templated_page(weapon_type, template_page):
     weapon_dscr = weapon_type + " " + str(len(weapons_type[weapon_type])) + " weapons"
 
@@ -331,25 +328,4 @@ else:
     generate_general_page(ijustwanttobreaktherules)
 
 
-
-
-if False:
-    f = open("items.csv", "w+")
-    
-    def weapon_comparator2(w):
-        return (w['OldLevel'], list(w['WEAPON_NAME']).reverse())
-    
-    sss = []
-    for t in weapons_type:
-        for w in weapons_type[t]:
-            sss.append(w)
-    
-    
-    for w in sorted(sss, key=weapon_comparator2):
-        f.write("\t".join([w['ID'], w['WEAPON_NAME'], str(w['Level']), str(w['OldLevel']), w['JOB'], ';'.join(w['Bonus_Serialization'])]) + "\n")
-    
-    f.close()
-    
-    
-    
 

@@ -8,7 +8,6 @@ import os
 
 configuration = None
 
-NUMBER_OF_PARAMS = 6
 ITEM_MANAGER = None
 
 ITEM_REGEX = "([A-Za-z0-9_]+)"
@@ -72,10 +71,10 @@ def load_configuration():
             elif field == "propItem":
                 configuration['propItem'] = value.strip()
             elif field == "propItemParameters":
-                NUMBER_OF_PARAMS = int(value)
+                configuration['propItemParameters'] = int(value)
             elif field == "modifyInPlace":
                 configuration['modifyInPlace'] = value == "True"
-            elif field == "legendaryemeraldvolcanoterrasunzeroflyff"
+            elif field == "legendaryemeraldvolcanoterrasunzeroflyff":
                 configuration['LEVTSZF'] = value == "True"
             
     # Normalize configuration
@@ -105,6 +104,8 @@ def load_configuration():
 # reminded by other functions, but you need to call it once if your number of dw param is different than 6
 def get_item_manager():
     global ITEM_MANAGER
+    global configuration
+    load_configuration()
     
     if ITEM_MANAGER is None:
         number_of_parameters = configuration['propItemParameters']

@@ -6,16 +6,12 @@ from jinja2 import Environment, FileSystemLoader
 import os
 import items_manager
 
-
 path = "..\\..\\FlyFF-VS17\\Resource\\" if len(sys.argv) < 2 else sys.argv[1]
 propItem_filename = "propItem.txt" if len(sys.argv) < 3 else sys.argv[2]
 number_of_parameters = 6 if len(sys.argv) < 4 else sys.argv[3]
 
-
 item_manager = items_manager.get_item_manager(number_of_parameters)
 item_list = items_manager.get_item_list(path + propItem_filename)
-
-
 
 modified_items = {}
 
