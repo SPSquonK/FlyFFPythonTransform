@@ -88,6 +88,6 @@ with open(path + propItem_filename, encoding="ansi") as f:
         new_propItemContent.append("\t".join(parameters_list))
 
 
-f = open("newPropItem.txt", "w+", encoding="ansi")
+f = open(path + propItem_filename, "w+", encoding="ansi")
 f.write("\n".join(new_propItemContent))
 f.close()
