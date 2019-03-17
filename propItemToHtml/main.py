@@ -1,28 +1,11 @@
 import sys
 import re
-import string
 from collections import OrderedDict 
 from jinja2 import Environment, FileSystemLoader
-import os
 
 import items_manager
 
-js = False
-
-args = []
-args.extend(sys.argv)
-
-if len(args) >= 2 and args[1] == "JS":
-    js = True
-    print("JS activated")
-    for i in range(len(args) - 1):
-        args[i] = args[i + 1]
-    args.pop(len(args) - 1)
-
-
-path = "..\\..\\FlyFF-VS17\\Resource\\" if len(args) < 2 else args[1]
-propItem_filename = "propItem.txt" if len(args) < 3 else args[2]
-number_of_parameters = 6 if len(args) < 4 else args[3]
+js = len(sys.argv) >= 2 and sys.argv[1] == "JS"
 
 weapons_type = OrderedDict()
 
@@ -56,7 +39,8 @@ def read_text_file(file, replacement_function ,encoding="utf-16-le"):
                 continue
             
             replacement_function(identifier, text)
-            
+
+
 def add_types(dict, list):
     for item in list:
         dict[item] = []
@@ -65,12 +49,9 @@ def add_types(dict, list):
 add_types(weapons_type, ['IK3_SWD', 'IK3_AXE', 'IK3_CHEERSTICK', 'IK3_KNUCKLEHAMMER', 'IK3_WAND', 'IK3_STAFF',
                          'IK3_YOYO', 'IK3_BOW', 'IK3_CROSSBOW', 'IK3_SHIELD', 'IK3_MAGICBARUNA', 'IK3_ZEMBARUNA'])
 
-# Normalize path
-if path[-1] != '\\':
-    path = path + '\\'
 
 # Read propItem
-item_list = items_manager.get_item_list(path + propItem_filename)
+item_list = items_manager.get_item_list()
 
 for item_name in item_list:
     item = item_list[item_name]
@@ -87,14 +68,15 @@ def replace_txt(identifier, text):
             if weapon['TXT_NAME'] == identifier:
                 weapon['WEAPON_NAME'] = text
 
-read_text_file(path + "propItem.txt.txt", replace_txt)
+
+read_text_file(items_manager.path() + "propItem.txt.txt", replace_txt)
 
 
 # Look for tooltip corresponding to dst
 tooltips = {}
 tooltips_rate = {}
 
-with open(path + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as f:
+with open(items_manager.path() + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as f:
     mode = 0  # 0 = search for an array, 1 = tooltip, 2 = rate
     for line in f.readlines():
         line = line.strip().replace(u"\ufeff", "")
@@ -120,7 +102,7 @@ with open(path + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as 
                         tooltips_rate[m[0]] = True
 
 mode = 0
-with open(path + "textClient.inc", encoding="utf-16-le") as f:
+with open(items_manager.path() + "textClient.inc", encoding="utf-16-le") as f:
     for line in f.readlines():
         if mode == 0:
             space_pos = line.find("0x")
@@ -145,7 +127,7 @@ def replace_tooltip(identifier, text):
             tooltips[tooltip_name] = text
 
 
-read_text_file(path + "textClient.txt.txt", replace_tooltip)
+read_text_file(items_manager.path() + "textClient.txt.txt", replace_tooltip)
 
 # Set jobs names
 job_names = {}
@@ -155,14 +137,14 @@ def define_job_names(ident, value):
 
     job_names[ident] = value
 
-read_text_file(path + "etc.txt.txt", define_job_names, "utf-16-le")
+read_text_file(items_manager.path() + "etc.txt.txt", define_job_names, "utf-16-le")
 
 
 jtype_with_symbols = {'JTYPE_MASTER' : "-M", 'JTYPE_HERO' : "-H"}
 
 jobs = {}
 
-with open(path + "etc.inc", encoding="utf-16-le") as f:
+with open(items_manager.path() + "etc.inc", encoding="utf-16-le") as f:
     for line in f.readlines():
         line = line.strip()
         m = re.findall("(JOB_[A-Z_]*)\s*(IDS_ETC_[A-Z_0-9]*)\s*[A-Z_0-9]*\s*(JTYPE_[A-Z]*)", line)
@@ -234,27 +216,29 @@ def value_of_job(job_name):
 def weapon_comparator(w):
     return (w['DOUBLE_HANDED'], value_of_job(w['JOB']), w['OldLevel'], w['WEAPON_NAME'])
 
-def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
-    if w['JOB'].find("_MASTER") != -1 or w['JOB'].find("_HERO") != -1:
-        for list in jobs_values:
-            if w['JOB'] not in list:
-                continue
 
-            index = list.index(w['JOB'])
-            w['JOB'] = jobs_values[0][index + 5]
-            break
-    w['OldLevel'] = w['Level']
-    
-    if w['Level'] <= 15:
-        w['Level'] = 1
-    elif w['Level'] < 60:
-        w['Level'] = int((w['Level'] - 15) / 3 + 5)
-    elif w['Level'] <= 125:
-        w['Level'] = w['Level'] - 40
-    else:
-        w['Level'] = 100
+if items_manager.adjustForLEVTSZF():
+    def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
+        if w['JOB'].find("_MASTER") != -1 or w['JOB'].find("_HERO") != -1:
+            for list in jobs_values:
+                if w['JOB'] not in list:
+                    continue
 
-for_each_weapon(legendary_emerald_volcano_terra_sun_zero_flyff_adjustements)
+                index = list.index(w['JOB'])
+                w['JOB'] = jobs_values[0][index + 5]
+                break
+        w['OldLevel'] = w['Level']
+        
+        if w['Level'] <= 15:
+            w['Level'] = 1
+        elif w['Level'] < 60:
+            w['Level'] = int((w['Level'] - 15) / 3 + 5)
+        elif w['Level'] <= 125:
+            w['Level'] = w['Level'] - 40
+        else:
+            w['Level'] = 100
+
+    for_each_weapon(legendary_emerald_volcano_terra_sun_zero_flyff_adjustements)
 
 
 def serialize_js(weapon_type):
@@ -265,7 +249,7 @@ def serialize_js(weapon_type):
     for w in weapons:
         bonuss = []
         bonuss.extend(w['Bonus'])
-        while len(bonuss) != number_of_parameters:
+        while len(bonuss) != items_manager.nb_param():
             bonuss.append(("=", 0))
     
         dict.append({
@@ -314,12 +298,10 @@ else:
     template = 'template.htm'
 
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 html_file = ""
 
-j2_env = Environment(loader=FileSystemLoader(THIS_DIR), trim_blocks=True)
+j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
 
 ijustwanttobreaktherules = ""
 
@@ -329,12 +311,12 @@ ijustwanttobreaktherules = ""
 def generate_templated_page(weapon_type, template_page):
     weapon_dscr = weapon_type + " " + str(len(weapons_type[weapon_type])) + " weapons"
 
-    return "\r\n" + j2_env.get_template(template).render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]), bonustypes=bonustypes, nbparam=number_of_parameters)
+    return "\r\n" + j2_env.get_template(template).render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]), bonustypes=bonustypes, nbparam=items_manager.nb_param())
 
 
 def generate_general_page(ijustwanttobreaktherules, page_name="itemlist.html"):
     content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
-    f = open(page_name, "w+")
+    f = open(items_manager.THIS_DIR + page_name, "w+")
     f.write(content)
     f.close()
 

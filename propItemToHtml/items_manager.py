@@ -1,22 +1,113 @@
+import re
 from collections import OrderedDict 
+import os
 
 '''
     This file gives useful functions to read propItem.txt files
 '''
 
+configuration = None
+
 NUMBER_OF_PARAMS = 6
 ITEM_MANAGER = None
 
 ITEM_REGEX = "([A-Za-z0-9_]+)"
+THIS_DIR = os.path.dirname(os.path.abspath(__file__)) + "\\"
+
+
+def getPropItemPath():
+    global configuration
+    load_configuration()
+    return configuration['path'] + configuration['propItem']
+
+
+def path():
+    global configuration
+    load_configuration()
+    return configuration['path']
+
+
+def nb_param():
+    global configuration
+    load_configuration()
+    return configuration['propItemParameters']
+
+
+def modifiedPropItem():
+    global configuration
+    load_configuration()
+    
+    return getPropItemPath() if configuration['modifyInPlace'] else THIS_DIR + configuration['propItem']
+
+
+def adjustForLEVTSZF():
+    global configuration
+    load_configuration()
+    return configuration['LEVTSZF']
+    
+
+def load_configuration():
+    global configuration
+    if configuration is not None:
+        return
+        
+    configuration = {}
+
+    # Read file
+    with open("config.txt") as f:
+        for line in f.readlines():
+            if line.startswith("//"):
+                continue
+            
+            m = re.match("([A-Za-z]*) = (.*)$", line)
+            
+            if m is None:
+                continue
+                
+            field = m.group(1)
+            value = m.group(2)
+            
+            if field == "path":
+                configuration['path'] = value.strip()
+            elif field == "propItem":
+                configuration['propItem'] = value.strip()
+            elif field == "propItemParameters":
+                NUMBER_OF_PARAMS = int(value)
+            elif field == "modifyInPlace":
+                configuration['modifyInPlace'] = value == "True"
+            elif field == "legendaryemeraldvolcanoterrasunzeroflyff"
+                configuration['LEVTSZF'] = value == "True"
+            
+    # Normalize configuration
+    default_values = {
+        "path": "..\\..\\FlyFF-VS17\\Resource\\",
+        "propItem": "propItem.txt",
+        "propItemParameters": 6,
+        "modifyInPlace": True,
+        "LEVTSZF": False
+    }
+    
+    for default_value_type in default_values:
+        if default_value_type not in configuration or configuration[default_value_type] == "":
+            configuration[default_value_type] = default_values[default_value_type]
+    
+    print(configuration)
+    
+    if configuration['path'][-1] != "\\" and configuration['path'][-1] != "/":
+        configuration['path'] = configuration['path'] + "\\"
+    
+    # Force reload
+    global ITEM_MANAGER
+    ITEM_MANAGER = None
+    get_item_manager()
 
 # Gives the right item manager to your number of parameters. You can not store it, as it will be
 # reminded by other functions, but you need to call it once if your number of dw param is different than 6
-def get_item_manager(number_of_parameters=6):
+def get_item_manager():
     global ITEM_MANAGER
-    global NUMBER_OF_PARAMS
     
-    if ITEM_MANAGER is None or NUMBER_OF_PARAMS != number_of_parameters:
-        NUMBER_OF_PARAMS = number_of_parameters
+    if ITEM_MANAGER is None:
+        number_of_parameters = configuration['propItemParameters']
     
         ITEM_MANAGER = {
             'ID': 1,
@@ -38,7 +129,8 @@ def get_item_manager(number_of_parameters=6):
 # Decrypt an item with the line in propItem. You can 
 def decrypt_item(line, item_manager=ITEM_MANAGER):
     if item_manager is None:
-        item_manager = get_item_manager()
+        load_configuration()
+        item_manager = ITEM_MANAGER
     
     line = line.strip().replace(str(chr(10)), "").replace("\r", "")
     
@@ -73,9 +165,13 @@ def decrypt_item(line, item_manager=ITEM_MANAGER):
 
 
 # Gives an ordered dictionnary with every items in propItem
-def get_item_list(propItem_path, item_manager=ITEM_MANAGER):
+def get_item_list(propItem_path=None, item_manager=ITEM_MANAGER):
     if item_manager is None:
-        item_manager = get_item_manager()
+        load_configuration()
+        item_manager = ITEM_MANAGER
+        
+    if propItem_path is None:
+        propItem_path = getPropItemPath()
 
     items = OrderedDict()
 
@@ -89,4 +185,5 @@ def get_item_list(propItem_path, item_manager=ITEM_MANAGER):
 
 
 if __name__ == '__main__':
-    print(get_item_list("..\\..\\FlyFF-VS17\\Resource\\propItem.txt"))
+    load_configuration()
+    print(get_item_list())
