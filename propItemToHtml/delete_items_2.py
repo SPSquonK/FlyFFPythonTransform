@@ -57,9 +57,12 @@ with open(items_manager.modifiedPropItem(), encoding="ansi") as f:
             new_propItemContent.append("")
             continue
         
-        if len(parameters_list) != item_manager['EXPECTED_LENGTH']:
+        if item_manager['DEFAULT_ON_EXP_LENGTH']:
             print("propItem is not well formed at line : " + line + " " + str(len(line)))
             exit(0)
+        else:
+            item_manager['DEFAULT_ON_EXP_LENGTH'] = True
+            item_manager['EXPECTED_LENGTH'] = len(parameters_list)
             
         if parameters_list[item_manager['ID']] in delete_items:
             continue

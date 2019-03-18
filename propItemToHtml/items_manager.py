@@ -121,7 +121,8 @@ def get_item_manager():
             'SZICON': 132 - (6 - number_of_parameters) * 4,
             'LEVEL': 128 - (6 - number_of_parameters) * 4,
             'LEN_DW_PARAM': number_of_parameters,
-            'EXPECTED_LENGTH': 136 - (6 - number_of_parameters) * 4 
+            'EXPECTED_LENGTH': 136 - (6 - number_of_parameters) * 4,
+            'DEFAULT_ON_EXP_LENGTH': False
         }
 
     return ITEM_MANAGER
@@ -133,15 +134,24 @@ def decrypt_item(line, item_manager=ITEM_MANAGER):
         load_configuration()
         item_manager = ITEM_MANAGER
     
-    line = line.strip().replace(str(chr(10)), "").replace("\r", "")
+    line = line.replace(str(chr(10)), "").replace("\r", "").strip()
     
-    if line is None or line.startswith("//"):
+    if line is None or line.startswith("//") or line == "":
         return None
     
     parameters_list = line.split("\t")
     
-    if len(parameters_list) != item_manager['EXPECTED_LENGTH']:
+    
+    if len(parameters_list) == 0 or parameters_list is None:
         return None
+    
+    if item_manager['EXPECTED_LENGTH'] != len(parameters_list):
+        if item_manager['DEFAULT_ON_EXP_LENGTH']:
+            print("propItem is not well formed at line : " + line + " " + str(len(line)))
+            exit(0)
+        else:
+            item_manager['DEFAULT_ON_EXP_LENGTH'] = True
+            item_manager['EXPECTED_LENGTH'] = len(parameters_list)
     
     bonus = []
     for i in range(item_manager['LEN_DW_PARAM']):
