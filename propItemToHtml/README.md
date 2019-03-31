@@ -1,5 +1,7 @@
 # propItem to HTML
 
+"I should probably gives this folder its own repo, and replace the dictionnary abuse with class."
+
 ## Goal
 
 ### main.py
@@ -12,9 +14,11 @@ An example generated file can be seen here http://sflyff.fr/items/
 
 You need to convert yourself the .dss images in a .png format and put them in the Item folder in the same folder as the generated html file.
 
-## delete_items.py
 
-Don't use it
+It uses the configuration file found as "config.txt" to determine the project parameters.
+
+It also uses args parameters. Just type `python3 main.py -h` to get a cool arg list as I just learned about argparse.
+
 
 ## delete_items_2.py
 

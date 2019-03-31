@@ -542,6 +542,20 @@ def group_comparator(g):
     return 0
 
 
+def extract_one_item(set_groups):
+    return 0
+
+
+def normalize_armors(set_groups):
+    json_group = []
+
+    for groups in set_groups:
+        one_item = extract_one_item(set_groups)
+
+    return sorted(json_group, key=group_comparator)
+
+
+
 def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
     # Existing sets
     existing_sets = read_existing_sets(bonus_types, bonus_types_rate)
@@ -554,9 +568,9 @@ def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_typ
     set_groups = match_group_and_sets(solo, grouped_items_by_category, existing_sets)
 
     # TODO : Make the template
-    # set_groups = sorted(set_groups, key=group_comparator)
     j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-    # code = j2_env.get_template('general_template.htm').render(groups=set_groups, bonus_types=bonus_types)
+    # normalized_armors = normalize_armors(set_groups) includes sorted(set_groups, key=group_comparator)
+    # code = j2_env.get_template('general_template.htm').render(groups=normalized_armors, bonus_types=bonus_types)
     # write_page(j2_env, code, 'armor_list.html')
 
 

@@ -1,30 +1,33 @@
-<h2>{{ weaponname }}</h2>
 
-
-
-<table>
-    <tr>
-    
-    </tr>
-
+{% for group in groups %}
 
 <table>
     <tr>
-        <td>Icone</td>
-        <td>ID</td>
-        <td>Nom</td>
-        <td>Classe</td>
-        <td>Niveau</td>
-        <td>Bonus</td>
+        <td>{{ group.name }}<br>{{ group.level }}<br>{{ group.job }}</td>
+        <td>{{ group.bonus }}</td>
     </tr>
-    {% for weapon in weapons %}
     <tr>
-        <td><img src="{{ weapon.icon }}"></td>
-        <td>{{ weapon.id }}</td>
-        <td>{{ weapon.name }}</td>
-        <td>{{ weapon.job }}</td>
-        <td>{{ weapon.level }}</td>
-        <td>{{ weapon.bonus }}</td>
+        <table>
+            {% for subgroup in group.subgroups %}
+                <tr>
+                    <td>
+                        <table>
+                            {% for category in subgroup %}
+                                <tr>
+                                    <td><img src="{{ category.maleicon }}"></td>
+                                    <td>{{ category.malename }}</td>
+                                    <td>{{ category.bonus }}</td>
+                                    <td>{{ category.femalename }}</td>
+                                    <td><img src="{{ category.femaleicon }}"></td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                        
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
     </tr>
-    {% endfor %}
 </table>
+
+{% endfor %}
