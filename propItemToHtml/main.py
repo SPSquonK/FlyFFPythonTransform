@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-import sys
 import re
 from collections import OrderedDict 
 from jinja2 import Environment, FileSystemLoader
 import argparse
-import collections
 # Custom import
 import items_manager
 
@@ -289,6 +287,93 @@ def generate_html_edit(j2_env, template_page, classified_serialization, bonus_ty
         write_page(j2_env, html_content, "item_list_" + classification['Name'] + ".htm")
 
 
+def finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
+    classified_serialization = classify(serialization, item_kinds_3)
+
+    # Page Generation
+    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
+    generate_html(j2_env, 'template.htm', classified_serialization)
+
+    if args_result.edit:
+        bonus_types_js = [{'DST': '=', 'Name': ''}]
+        for bonus_type in bonus_types:
+            percent = " (%)" if bonus_type in bonus_types_rate else ""
+            bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
+        generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
+
+
+# ======================================================================================================================
+# ======================================================================================================================
+# -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS
+
+def group_armor_by_sex(serialization):
+    def modify_id(original_id, letter):
+        return original_id[0:position_char_to_replace] + letter + original_id[position_char_to_replace + 1:]
+
+    constants = {'VALID_CHARACTER': "[0-9_A-Za-z]"}
+    constants['REGEX_M'] = "II_ARM_M_" + constants['VALID_CHARACTER'] + "*"
+    constants['REGEX_F'] = "II_ARM_F_" + constants['VALID_CHARACTER'] + "*"
+    constants['REGEX_MEnd'] = "II_ARM_LC_" + constants['VALID_CHARACTER'] + "*" + "_M"
+    constants['REGEX_FEnd'] = "II_ARM_LC_" + constants['VALID_CHARACTER'] + "*" + "_F"
+    position_char_to_replace = 7
+
+    grouped = []
+    used_items = set()
+
+    for item_id in serialization:
+        if item_id in used_items:
+            continue
+
+        if re.match(constants['REGEX_M'], item_id):
+            corresponding_id = modify_id(item_id, 'F')
+            is_male = True
+        elif re.match(constants['REGEX_F'], item_id):
+            corresponding_id = modify_id(item_id, 'M')
+            is_male = False
+        elif re.match(constants['REGEX_MEnd'], item_id):
+            corresponding_id = item_id[:-1] + 'F'
+            is_male = True
+        elif re.match(constants['REGEX_FEnd'], item_id):
+            corresponding_id = item_id[:-1] + 'M'
+            is_male = False
+        else:
+            continue
+
+        if corresponding_id in serialization:
+            used_items.add(item_id)
+            used_items.add(corresponding_id)
+
+            grouped.append([item_id, corresponding_id])
+
+            '''
+            if is_male:
+                grouped.append((None, serialization[item_id], serialization[corresponding_id]))
+            else:
+                grouped.append((None, serialization[corresponding_id], serialization[item_id]))
+            '''
+
+    for item_id in serialization:
+        if item_id not in used_items:
+            grouped.append([item_id])
+            #grouped.append((serialization[item_id], None, None))
+
+    return grouped
+
+
+def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
+
+    grouped_items_by_sex = group_armor_by_sex(serialization)
+
+    print ('\n'.join(map(str, grouped_items_by_sex)))
+    print(len(grouped_items_by_sex))
+    return 0
+
+
+# ======================================================================================================================
+# ======================================================================================================================
+# -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN
+
+
 def main():
     arg_parser = make_arg_parser()
     args_result = arg_parser.parse_args()
@@ -321,18 +406,11 @@ def main():
     # Categorization
     job_list = read_jobs()
     serialization = serialize_items(item_list, job_list)
-    classified_serialization = classify(serialization, item_kinds_3)
 
-    # Page Generation
-    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-    generate_html(j2_env, 'template.htm', classified_serialization)
-
-    if args_result.edit:
-        bonus_types_js = [{'DST': '=', 'Name': ''}]
-        for bonus_type in bonus_types:
-            percent = " (%)" if bonus_type in bonus_types_rate else ""
-            bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
-        generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
+    if args_result.kind == 'weapons':
+        finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate)
+    elif args_result.kind == 'armors':
+        finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate)
 
 
 if __name__ == '__main__':
