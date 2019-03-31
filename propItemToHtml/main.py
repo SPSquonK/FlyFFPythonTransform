@@ -120,25 +120,28 @@ def read_bonus_types():
     return tooltips, tooltips_rate
 
 
+def get_bonus_serialization(bonus_kind, bonus_value, bonus_types, bonus_types_rate):
+    if bonus_kind in bonus_types:
+        bonus_type_serialized = bonus_types[bonus_kind]
+    else:
+        bonus_type_serialized = bonus_kind
+        bonus_types[bonus_kind] = bonus_kind
+
+    percent_mark = "%" if bonus_kind in bonus_types_rate else ""
+
+    return bonus_type_serialized + " + " + str(bonus_value) + percent_mark
+
+
 def serialize_bonus_types(item_list, bonus_types, bonus_types_rate):
     def set_bonus_name(weapon):
         weapon['Bonus_Serialization'] = []
 
         for bonus_type, bonus_value in weapon['Bonus']:
-            if bonus_type in bonus_types:
-                bonus_type_serialized = bonus_types[bonus_type]
-            else:
-                bonus_type_serialized = bonus_type
-                bonus_types[bonus_type] = bonus_type
-
-            percent_mark = "%" if bonus_type in bonus_types_rate else ""
-
-            weapon['Bonus_Serialization'].append(bonus_type_serialized + " + " + str(bonus_value) + percent_mark)
+            serial = get_bonus_serialization(bonus_type, bonus_value, bonus_types, bonus_types_rate)
+            weapon['Bonus_Serialization'].append(serial)
 
     for item_id in item_list:
         set_bonus_name(item_list[item_id])
-
-    return 0
 
 
 def read_jobs():
@@ -317,7 +320,7 @@ def group_armor_by_sex(serialization):
     constants['REGEX_FEnd'] = "II_ARM_LC_" + constants['VALID_CHARACTER'] + "*" + "_F"
     position_char_to_replace = 7
 
-    grouped = []
+    grouped = {}
     used_items = set()
 
     for item_id in serialization:
@@ -343,30 +346,218 @@ def group_armor_by_sex(serialization):
             used_items.add(item_id)
             used_items.add(corresponding_id)
 
-            grouped.append([item_id, corresponding_id])
-
-            '''
             if is_male:
-                grouped.append((None, serialization[item_id], serialization[corresponding_id]))
+                grouped[item_id] = (serialization[item_id], serialization[corresponding_id])
             else:
-                grouped.append((None, serialization[corresponding_id], serialization[item_id]))
-            '''
+                grouped[corresponding_id] = (serialization[corresponding_id], serialization[item_id])
 
     for item_id in serialization:
         if item_id not in used_items:
-            grouped.append([item_id])
-            #grouped.append((serialization[item_id], None, None))
+            print(str(item_id) + " is excluded")
 
     return grouped
 
+def group_armor_by_category(serialization):
+    constants = {'VALID_CHARACTER': "[0-9_A-Za-z]"}
+    # We don't group id that doesn't follow the REGEX_M scheme
+    constants['REGEX_M'] = "II_ARM_M_" + constants['VALID_CHARACTER'] + "*"
+
+    constants['START_REGEX'] = "II_ARM_M(_" + constants['VALID_CHARACTER'] + "*_?)?"
+    constants['END_REGEX'] = "(_?" + constants['VALID_CHARACTER'] + "*)?"
+
+    def match_with(item_id):
+        possible_match = ['HELMET', 'SUIT', 'GAUNTLET', 'BOOTS']
+        for part in possible_match:
+            r = re.match(constants['START_REGEX'] + part + constants['END_REGEX'], item_id)
+            if r is not None:
+                return r.group(1), r.group(2), part
+
+        return None
+
+    grouped = {}
+    solo = []
+
+    for male_item_id in serialization:
+        match_result = match_with(male_item_id)
+
+        if match_result is None:
+            solo.append(serialization[male_item_id])
+        else:
+            set_id = (match_result[0], match_result[1])
+            if set_id not in grouped:
+                grouped[set_id] = {}
+
+            grouped[set_id][match_result[2]] = serialization[male_item_id]
+
+    return grouped, solo
+
+def read_raw_data_set():
+    # It's basically a bad automat but I'm too lazy to find one or properly develop one
+    # states = ['SetItem', '/*', 'SetItem{', 'ElemOrAvail', 'Elem{', 'InElem', 'Avail{', 'InAvail']
+    d = {}
+    state = 'SetItem'
+
+    auto_next_state = {
+        'SetItem{': 'ElemOrAvail',
+        'Elem{': 'InElem',
+        'Avail{': 'InAvail',
+    }
+
+    current_ids = ''
+
+    with open(items_manager.path() + "propItemEtc.inc", encoding="utf-16-le") as f:
+        for line in f.readlines():
+            if state == 'SetItem':
+                if line.startswith('/*'):
+                    state = '/*'
+                else:
+                    m = re.findall("\\s*SetItem\\s*[0-9]*\\s*([A-Z0-9_a-z]*)(\\s*.*)?", line)
+                    if m is not None and len(m) > 0:
+                        current_ids = m[0][0]
+                        d[current_ids] = {'parts': [], 'bonus': []}
+                        state = 'SetItem{'
+            elif state == '/*':
+                if line.find('*/') != -1:
+                    state = 'SetItem'
+            elif state == 'ElemOrAvail':
+                if line.find('Elem') != -1:
+                    state = 'Elem{'
+                elif line.find('Avail') != -1:
+                    state = 'Avail{'
+                elif line.find('}') != -1:
+                    state = 'SetItem'
+                else:
+                    print("LINE = [" + line + "]")
+                    raise Exception('Unexpected line in state ' + state)
+            elif state == 'InElem':
+                if line.find('}') != -1:
+                    state = 'ElemOrAvail'
+                else:
+                    r = '[A-Za-z_0-9]+'
+                    m = re.findall(r, line)
+
+                    if m is not None and len(m) > 0:
+                        d[current_ids]['parts'].append(m[0])
+            elif state == 'InAvail':
+                if line.find('}') != -1:
+                    state = 'ElemOrAvail'
+                else:
+                    regex = '([A-Za-z_0-9]*)\\s*([0-9]*)\\s*([0-9])'
+                    result = re.findall(regex, line)
+
+                    if result is not None and len(result) > 0:
+                        d[current_ids]['bonus'].append((int(result[0][2]), result[0][0], result[0][1]))
+            else:
+                state = auto_next_state[state]
+
+    return d
+
+def write_set_name(raw_data):
+    def replacement(identifier, value):
+        if identifier in raw_data:
+            raw_data[identifier]['Name'] = value
+
+    items_manager.read_text_file(items_manager.path() + 'propItemEtc.txt.txt', replacement)
+
+
+def serialize_bonus(raw_data, bonus_types, bonus_types_rate):
+    for armor_set_ids in raw_data:
+        armor_set = raw_data[armor_set_ids]
+        armor_set['Bonus_Serialization'] = {2:[], 3:[], 4:[]}
+        for bonus_group in armor_set['bonus']:
+            if bonus_group[0] in (2, 3, 4):
+                serial = get_bonus_serialization(bonus_group[1], bonus_group[2], bonus_types, bonus_types_rate)
+                armor_set['Bonus_Serialization'][bonus_group[0]].append(serial)
+
+
+def read_existing_sets(bonus_types, bonus_types_rate):
+    raw_data = read_raw_data_set()
+    write_set_name(raw_data)
+    serialize_bonus(raw_data, bonus_types, bonus_types_rate)
+
+    return raw_data
+
+
+def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
+    matching = {}
+
+    # Solo Items
+    for i in range(len(solo)):
+        matching['SoloItem' + str(i)] = {
+            'Name': "",
+            'Bonus': [],
+            'Bonus_Serialized': [],
+            'Groups': [solo[i]],
+            'Solo': True
+        }
+
+    # Groups
+    def flatten_item(item_arrangment):
+        item_list_male = []
+        item_list_female = []
+
+        for key in item_arrangment:
+            item_list_male.append(item_arrangment[key][0]['id'])
+            item_list_female.append(item_arrangment[key][1]['id'])
+
+        return item_list_male, item_list_female
+
+    i = 0
+    for group_key in grouped_items_by_category:
+        components_m, components_f = flatten_item(grouped_items_by_category[group_key])
+
+        is_ok = False
+        for set_ids in existing_sets:
+            existing_set = existing_sets[set_ids]
+            if set(components_m).issubset(set(existing_set['parts'])):
+                is_ok = True
+                break
+
+        if not is_ok:
+            matching['GroupItem' + str(i)] = {
+                'Name': "",
+                'Bonus': [],
+                'Bonus_Serialized': [],
+                'Groups': [grouped_items_by_category[group_key]],
+                'Solo': False
+            }
+            i = i + 1
+        else:
+            if set_ids not in matching:
+                matching[set_ids] = {
+                    'Name': existing_set['Name'],
+                    'Bonus': existing_set['bonus'],
+                    'Bonus_Serialized': existing_set['Bonus_Serialization'],
+                    'Groups': [],
+                    'Solo': False
+                }
+
+            matching[set_ids]['Groups'].append(grouped_items_by_category[group_key])
+
+    return matching
+
+
+def group_comparator(g):
+    # TODO
+    return 0
+
 
 def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
+    # Existing sets
+    existing_sets = read_existing_sets(bonus_types, bonus_types_rate)
 
+    # Reading items
     grouped_items_by_sex = group_armor_by_sex(serialization)
+    grouped_items_by_category, solo = group_armor_by_category(grouped_items_by_sex)
 
-    print ('\n'.join(map(str, grouped_items_by_sex)))
-    print(len(grouped_items_by_sex))
-    return 0
+    # Matching groups with sets
+    set_groups = match_group_and_sets(solo, grouped_items_by_category, existing_sets)
+
+    # TODO : Make the template
+    # set_groups = sorted(set_groups, key=group_comparator)
+    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
+    # code = j2_env.get_template('general_template.htm').render(groups=set_groups, bonus_types=bonus_types)
+    # write_page(j2_env, code, 'armor_list.html')
 
 
 # ======================================================================================================================

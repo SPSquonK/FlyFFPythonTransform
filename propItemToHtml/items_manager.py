@@ -210,6 +210,7 @@ def get_item_list(propItem_path=None, item_manager=ITEM_MANAGER):
             
     return items
 
+
 # Function to read .txt.txt files
 def read_text_file(file, replacement_function, encoding="utf-16-le"):
     with open(file, encoding=encoding) as f:
