@@ -24,11 +24,11 @@ def make_list_from_categorization(categorization):
     flat = []
 
     for a in categorization:
-        if isinstance(a, collections.Iterable):
+        if isinstance(a, str):
+            flat.append(a)
+        else:
             for b in a:
                 flat.append(b)
-        else:
-            flat.append(a)
 
     return flat
 
@@ -202,7 +202,13 @@ def serialize_items(item_list, job_list):
         return {
             'icon': item['image_path'],
             'id': item['ID'],
+            'IK3': item['IK3'],
+            'DOUBLE_HANDED': item['DOUBLE_HANDED'],
+            'JOB': item['JOB'],
+            'OldLevel': item['OldLevel'],
+            'Level': item['Level'],
             'name': item['WEAPON_NAME'],
+            'WEAPON_NAME': item['WEAPON_NAME'],
             'job': job_list[item['JOB']]['Name'] if item['JOB'] in job_list else item['JOB'],
             'level': str(item['Level']) + job_list[item['JOB']]['ExtraSymbol'] if item['JOB'] in job_list else "",
             'bonus': '<br>'.join(item['Bonus_Serialization']),
@@ -218,17 +224,17 @@ def serialize_items(item_list, job_list):
 
 
 def classify(serialization, item_kinds_3):
-    def make_name(item_kind_3):
-        if isinstance(item_kind_3, collections.Iterable):
-            return "-".join("item_kinds_3")
+    def make_name(ik3):
+        if isinstance(ik3, str):
+            return ik3
         else:
-            return item_kinds_3
+            return "-".join(ik3)
 
-    def is_valid(this_item, item_kind_3):
-        if isinstance(item_kind_3, collections.Iterable):
-            return this_item['IK3'] in item_kind_3
+    def is_valid(this_item, ik3):
+        if isinstance(ik3, str):
+            return this_item['IK3'] == ik3
         else:
-            return this_item['IK3'] == item_kind_3
+            return this_item['IK3'] in ik3
 
     def item_comparator(w):
         return w['DOUBLE_HANDED'], items_manager.value_of_job(w['JOB']),\
@@ -246,7 +252,8 @@ def classify(serialization, item_kinds_3):
             if is_valid(item, ik3_group):
                 classification['Items'].append(item)
 
-        classifications.append(sorted(classification, key=item_comparator))
+        classification['Items'] = sorted(classification['Items'], key=item_comparator)
+        classifications.append(classification)
 
     return classifications
 
@@ -259,7 +266,7 @@ def write_page(j2_env, html_content, page_name='item_list.htm'):
 
 
 def fill_template(j2_env, template, classification, bonus_types):
-    ik3 = classification['IK3']
+    ik3 = classification['Name']
     weapons = classification['Items']
 
     title = ik3 + " " + str(len(weapons)) + " items"
@@ -269,15 +276,17 @@ def fill_template(j2_env, template, classification, bonus_types):
 
 
 def generate_html(j2_env, template_page, classified_serialization):
-    write_page(j2_env, "\r\n".join(
-        [fill_template(j2_env, template_page, classified_serialization[i], None) for i in classified_serialization]))
+    html_code = []
+    for i in range(len(classified_serialization)):
+        html_code.append(fill_template(j2_env, template_page, classified_serialization[i], None))
+    write_page(j2_env, "\r\n".join(html_code))
 
 
 def generate_html_edit(j2_env, template_page, classified_serialization, bonus_types):
-    for i in classified_serialization:
+    for i in range(len(classified_serialization)):
         classification = classified_serialization[i]
         html_content = fill_template(j2_env, template_page, classification, bonus_types)
-        write_page(j2_env, html_content, "item_list_" + classification['IK3'] + ".htm")
+        write_page(j2_env, html_content, "item_list_" + classification['Name'] + ".htm")
 
 
 def main():
@@ -323,7 +332,7 @@ def main():
         for bonus_type in bonus_types:
             percent = " (%)" if bonus_type in bonus_types_rate else ""
             bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
-            generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
+        generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
 
 
 if __name__ == '__main__':
