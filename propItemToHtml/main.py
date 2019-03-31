@@ -538,21 +538,63 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
 
 
 def group_comparator(g):
-    # TODO
-    return 0
+    return g['level'], g['job'], g['name']
 
 
 def extract_one_item(set_groups):
-    return 0
+    first_group = set_groups['group'][0]
+
+    if first_group['is_solo']:
+        return first_group['List'][0][0]
+    else:
+        return first_group['List'][0][0][0]
+
+
+def normalize_subgroups(group):
+    subgroups = []
+
+    for subgroup in group['group']:
+        if subgroup['is_solo']:
+            subgroups.append([{
+                'male_icon': subgroup.item[0]['icon'],
+                'female_icon': subgroup.item[1]['icon'],
+                'male_name': subgroup.item[0]['name'],
+                'female_name': subgroup.item[1]['name'],
+                'bonus': subgroup.item[0]['Bonus_Serialized'],
+            }])
+        else:
+            l = []
+
+            for proper_item_set in subgroup['group']:
+                l.append({
+                    'male_icon': proper_item_set.item[0]['icon'],
+                    'female_icon': proper_item_set.item[1]['icon'],
+                    'male_name': proper_item_set.item[0]['name'],
+                    'female_name': proper_item_set.item[1]['name'],
+                    'bonus': proper_item_set.item[0]['Bonus_Serialized'],
+                })
+
+            subgroups.append(l)
+
+    return subgroups
 
 
 def normalize_armors(set_groups):
-    json_group = []
+    global_d = []
 
-    for groups in set_groups:
-        one_item = extract_one_item(set_groups)
+    for group_id in set_groups:
+        group = set_groups[group_id]
+        one_item = extract_one_item(set_groups[group_id])
 
-    return sorted(json_group, key=group_comparator)
+        global_d.append({
+            'name': group['Name'],
+            'level': one_item['Level'],
+            'job': one_item['job'],
+            'bonus': group['Serialized_Bonus'],
+            'subgroups': normalize_subgroups(group)
+        })
+
+    return sorted(global_d, key=group_comparator)
 
 
 
