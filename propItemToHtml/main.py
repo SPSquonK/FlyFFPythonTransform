@@ -34,7 +34,7 @@ def make_list_from_categorization(categorization):
 
 
 def filter_item_with_ik3(item_list, flatten_item_kinds_3):
-    new_item_list = {}
+    new_item_list = OrderedDict()
 
     for item in item_list:
         if item_list[item]['IK3'] in flatten_item_kinds_3:
@@ -63,7 +63,7 @@ def replace_txt(item_list, identifier, text):
 
 
 def read_bonus_types():
-    tooltips = {}
+    tooltips = OrderedDict()
     tooltips_rate = {}
 
     # Read WndManager to read existing bonus
@@ -192,11 +192,93 @@ def compute_icons(item_list):
         weapon['image_path'] = img
 
 
-def classify(a, b):
-    return 0
+def serialize_items(item_list, job_list):
+    def serialize_item(item):
+        bonus_js = []
+        bonus_js.extend(item['Bonus'])
+        while len(bonus_js) != items_manager.nb_param():
+            bonus_js.append(("=", 0))
 
-def serialize_items(a, job_list, b):
-    return 0
+        return {
+            'icon': item['image_path'],
+            'id': item['ID'],
+            'name': item['WEAPON_NAME'],
+            'job': job_list[item['JOB']]['Name'] if item['JOB'] in job_list else item['JOB'],
+            'level': str(item['Level']) + job_list[item['JOB']]['ExtraSymbol'] if item['JOB'] in job_list else "",
+            'bonus': '<br>'.join(item['Bonus_Serialization']),
+            'bonuss': bonus_js
+        }
+
+    serialized_list = {}
+
+    for item_id in item_list:
+        serialized_list[item_id] = serialize_item(item_list[item_id])
+
+    return serialized_list
+
+
+def classify(serialization, item_kinds_3):
+    def make_name(item_kind_3):
+        if isinstance(item_kind_3, collections.Iterable):
+            return "-".join("item_kinds_3")
+        else:
+            return item_kinds_3
+
+    def is_valid(this_item, item_kind_3):
+        if isinstance(item_kind_3, collections.Iterable):
+            return this_item['IK3'] in item_kind_3
+        else:
+            return this_item['IK3'] == item_kind_3
+
+    def item_comparator(w):
+        return w['DOUBLE_HANDED'], items_manager.value_of_job(w['JOB']),\
+            w['OldLevel'] if 'OldLevel' in w else w['Level'], w['WEAPON_NAME']
+
+    classifications = []
+
+    for i in range(len(item_kinds_3)):
+        ik3_group = item_kinds_3[i]
+        classification = {'Name': make_name(ik3_group), 'Items': []}
+
+        for item_id in serialization:
+            item = serialization[item_id]
+
+            if is_valid(item, ik3_group):
+                classification['Items'].append(item)
+
+        classifications.append(sorted(classification, key=item_comparator))
+
+    return classifications
+
+
+def write_page(j2_env, html_content, page_name='item_list.htm'):
+    content = j2_env.get_template('general_template.htm').render(html_content=html_content)
+    f = open(items_manager.THIS_DIR + page_name, "w+")
+    f.write(content)
+    f.close()
+
+
+def fill_template(j2_env, template, classification, bonus_types):
+    ik3 = classification['IK3']
+    weapons = classification['Items']
+
+    title = ik3 + " " + str(len(weapons)) + " items"
+
+    return j2_env.get_template(template).render(weaponname=title, weapons=weapons,
+                                                bonustypes=bonus_types, nbparam=items_manager.nb_param())
+
+
+def generate_html(j2_env, template_page, classified_serialization):
+    write_page(j2_env, "\r\n".join(
+        [fill_template(j2_env, template_page, classified_serialization[i], None) for i in classified_serialization]))
+
+
+def generate_html_edit(j2_env, template_page, classified_serialization, bonus_types):
+    for i in classified_serialization:
+        classification = classified_serialization[i]
+        html_content = fill_template(j2_env, template_page, classification, bonus_types)
+        write_page(j2_env, html_content, "item_list_" + classification['IK3'] + ".htm")
+
 
 def main():
     arg_parser = make_arg_parser()
@@ -214,7 +296,7 @@ def main():
 
     # Replace item names
     items_manager.read_text_file(items_manager.path() + "propItem.txt.txt",
-                                 lambda id, txt: replace_txt(item_list, id, txt))
+                                 lambda identifier, txt: replace_txt(item_list, identifier, txt))
 
     # Serialize bonus types
     bonus_types, bonus_types_rate = read_bonus_types()
@@ -229,115 +311,20 @@ def main():
 
     # Categorization
     job_list = read_jobs()
-    serialization = serialize_items(item_list, job_list, args_result.edit)
-
+    serialization = serialize_items(item_list, job_list)
     classified_serialization = classify(serialization, item_kinds_3)
 
+    # Page Generation
+    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
+    generate_html(j2_env, 'template.htm', classified_serialization)
 
-    '''
-    for i in item_list:
-        print(item_list[i]['WEAPON_NAME'])
-    '''
+    if args_result.edit:
+        bonus_types_js = [{'DST': '=', 'Name': ''}]
+        for bonus_type in bonus_types:
+            percent = " (%)" if bonus_type in bonus_types_rate else ""
+            bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
+            generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
 
 
 if __name__ == '__main__':
     main()
-
-exit(0)
-
-js = len(sys.argv) >= 2 and sys.argv[1] == "JS"
-
-weapons_type = OrderedDict()
-
-def for_each_weapon(used_function):
-    for weapon_type in weapons_type:
-        for weapon in weapons_type[weapon_type]:
-            used_function(weapon)
-
-
-# Generate HTML
-
-
-
-
-
-def append_one_weapon(dict, w):
-    bonuss = []
-    bonuss.extend(w['Bonus'])
-    while len(bonuss) != items_manager.nb_param():
-        bonuss.append(("=", 0))
-
-    dict.append({
-        'icon': w['image_path'],
-        'id': w['ID'],
-        'name': w['WEAPON_NAME'],
-        'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
-        'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
-        'bonus': '<br>'.join(w['Bonus_Serialization']),
-        'bonuss': bonuss
-    })
-
-
-def serialize_js(weapon_type):
-    def weapon_comparator(w):
-        return w['DOUBLE_HANDED'], items_manager.value_of_job(w['JOB']),\
-               w['OldLevel'] if 'OldLevel' in w else w['Level'], w['WEAPON_NAME']
-
-    d = []
-
-    weapons = sorted(weapon_type, key=weapon_comparator)
-
-    for w in weapons:
-        append_one_weapon(d, w)
-        
-    return d
-
-
-bonustypes = []
-
-if js:
-    serialize = serialize_js
-    
-    bonustypes.append({ 'DST': '=', 'Name': '' })
-    for t in tooltips:
-        percent = " (%)" if t in tooltips_rate else ""
-    
-        bonustypes.append({'DST': t, 'Name': tooltips[t] + percent})
-    
-    template = 'template_js.htm'
-else:
-    serialize = serialize_js
-    template = 'template.htm'
-
-
-
-html_file = ""
-
-j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-
-ijustwanttobreaktherules = ""
-
-def generate_templated_page(weapon_type, template_page):
-    weapon_dscr = weapon_type + " " + str(len(weapons_type[weapon_type])) + " weapons"
-
-    return "\r\n" + j2_env.get_template(template).render(weaponname=weapon_dscr, weapons=serialize(weapons_type[weapon_type]), bonustypes=bonustypes, nbparam=items_manager.nb_param())
-
-
-def generate_general_page(ijustwanttobreaktherules, page_name="itemlist.html"):
-    content = j2_env.get_template('general_template.htm').render(idontwannagotoschool=ijustwanttobreaktherules)
-    f = open(items_manager.THIS_DIR + page_name, "w+")
-    f.write(content)
-    f.close()
-
-if js:
-    for weapon_type in weapons_type:
-        ijustwanttobreaktherules = generate_templated_page(weapon_type, template)
-        generate_general_page(ijustwanttobreaktherules, "item_list_" + weapon_type + ".htm")
-else:
-    ijustwanttobreaktherules = ""
-    for weapon_type in weapons_type:
-        ijustwanttobreaktherules += generate_templated_page(weapon_type, template)
-    generate_general_page(ijustwanttobreaktherules)
-
-
-
