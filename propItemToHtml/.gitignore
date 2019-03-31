@@ -2,3 +2,7 @@ Item
 itemlist*
 item_list*
 __pycache__/
+index.html
+*.xml
+propItem*
+changed_bonus.txt

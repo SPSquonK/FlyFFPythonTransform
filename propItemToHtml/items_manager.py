@@ -6,6 +6,8 @@ import os
     This file gives useful functions to read propItem.txt files
 '''
 
+# Constants
+
 configuration = None
 
 ITEM_MANAGER = None
@@ -13,6 +15,20 @@ ITEM_MANAGER = None
 ITEM_REGEX = "([A-Za-z0-9_]+)"
 THIS_DIR = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
+JOBS_VALUE = [
+    ['JOB_VAGRANT', 'JOB_MERCENARY', 'JOB_ACROBAT', 'JOB_ASSIST', 'JOB_MAGICIAN',
+     'JOB_KNIGHT', 'JOB_BLADE', 'JOB_JESTER', 'JOB_RANGER',
+     'JOB_RINGMASTER', 'JOB_BILLPOSTER', 'JOB_PSYCHIKEEPER', 'JOB_ELEMENTOR'],
+    ['JOB_KNIGHT_MASTER', 'JOB_BLADE_MASTER', 'JOB_JESTER_MASTER', 'JOB_RANGER_MASTER',
+     'JOB_RINGMASTER_MASTER', 'JOB_BILLPOSTER_MASTER', 'JOB_PSYCHIKEEPER_MASTER', 'JOB_ELEMENTOR_MASTER'],
+    ['JOB_KNIGHT_HERO', 'JOB_BLADE_HERO', 'JOB_JESTER_HERO', 'JOB_RANGER_HERO',
+     'JOB_RINGMASTER_HERO', 'JOB_BILLPOSTER_HERO', 'JOB_PSYCHIKEEPER_HERO', 'JOB_ELEMENTOR_HERO'],
+    ['JOB_LORDTEMPLER_HERO', 'JOB_STORMBLADE_HERO', 'JOB_WINDLURKER_HERO', 'JOB_CRACKSHOOTER_HERO',
+     'JOB_FLORIST_HERO', 'JOB_FORCEMASTER_HERO', 'JOB_MENTALIST_HERO', 'JOB_ELEMENTORLORD_HERO'],
+    ['JOB_HERO']
+]
+
+# --
 
 def getPropItemPath():
     global configuration
@@ -193,6 +209,64 @@ def get_item_list(propItem_path=None, item_manager=ITEM_MANAGER):
                 items[item['ID']] = item
             
     return items
+
+# Function to read .txt.txt files
+def read_text_file(file, replacement_function, encoding="utf-16-le"):
+    with open(file, encoding=encoding) as f:
+        for line in f.readlines():
+            # TODO : Use a regex
+            line.replace(chr(10), " ")
+            index = line.find(" ")
+            indextab = line.find("\t")
+
+            if index == -1 and indextab == -1:
+                continue
+
+            if indextab != -1:
+                if index == -1:
+                    index = indextab
+                else:
+                    index = min(index, indextab)
+
+            identifier = line[0:index]
+            text = line[index:].strip()
+
+            if text is None:
+                continue
+
+            replacement_function(identifier, text)
+
+
+def adjust_for_levtszf(item_list):
+    def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
+        if w['JOB'].find("_MASTER") != -1 or w['JOB'].find("_HERO") != -1:
+            for jobs_value in JOBS_VALUE:
+                if w['JOB'] not in jobs_value:
+                    continue
+
+                index = jobs_value.index(w['JOB'])
+                w['JOB'] = JOBS_VALUE[0][index + 5]
+                break
+        w['OldLevel'] = w['Level']
+
+        if w['Level'] <= 15:
+            w['Level'] = 1
+        elif w['Level'] < 60:
+            w['Level'] = int((w['Level'] - 15) / 3 + 5)
+        elif w['Level'] <= 125:
+            w['Level'] = w['Level'] - 40
+        else:
+            w['Level'] = 100
+
+    for item_id in item_list:
+        legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(item_list[item_id])
+
+
+def value_of_job(job_name):
+    for i in range(len(JOBS_VALUE)):
+        if job_name in JOBS_VALUE[i]:
+            return i
+    return -1
 
 
 if __name__ == '__main__':

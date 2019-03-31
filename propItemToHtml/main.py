@@ -1,9 +1,249 @@
+#!/usr/bin/env python
 import sys
 import re
 from collections import OrderedDict 
 from jinja2 import Environment, FileSystemLoader
-
+import argparse
+import collections
+# Custom import
 import items_manager
+
+
+# Gives the list of IK3 to retrieve according to the given kind
+def get_categorization_from_kind(kind):
+    if kind == 'weapons':
+        return ['IK3_SWD', 'IK3_AXE', 'IK3_CHEERSTICK', 'IK3_KNUCKLEHAMMER', 'IK3_WAND', 'IK3_STAFF', 'IK3_YOYO',
+                'IK3_BOW', 'IK3_CROSSBOW', 'IK3_SHIELD', 'IK3_MAGICBARUNA', 'IK3_ZEMBARUNA']
+    elif kind == 'armors':
+        return [['IK3_HELMET', 'IK3_SUIT', 'IK3_GAUNTLET', 'IK3_BOOTS']]
+    else:
+        raise Exception('Unexpected kind ' + kind)
+
+
+def make_list_from_categorization(categorization):
+    flat = []
+
+    for a in categorization:
+        if isinstance(a, collections.Iterable):
+            for b in a:
+                flat.append(b)
+        else:
+            flat.append(a)
+
+    return flat
+
+
+def filter_item_with_ik3(item_list, flatten_item_kinds_3):
+    new_item_list = {}
+
+    for item in item_list:
+        if item_list[item]['IK3'] in flatten_item_kinds_3:
+            new_item_list[item] = item_list[item]
+
+    return new_item_list
+
+
+def make_arg_parser():
+    arg_parser = argparse.ArgumentParser(description="Creates a html page with every weapons or armors in the game")
+
+    arg_parser.add_argument('-e', '--edit', action='store_true',
+                            help='Generates several html page with edit options that generates '
+                            'the content of a file that the modify_bonus.py script can use to alter the source files.')
+    arg_parser.add_argument('-k', '--kind', choices=['weapons', 'armors'], default='weapons',
+                            help='Defines the kind of items that will be displayed')
+
+    return arg_parser
+
+
+# Replace IDS name with real name
+def replace_txt(item_list, identifier, text):
+    for weapon_id in item_list:
+        if item_list[weapon_id]['TXT_NAME'] == identifier:
+            item_list[weapon_id]['WEAPON_NAME'] = text
+
+
+def read_bonus_types():
+    tooltips = {}
+    tooltips_rate = {}
+
+    # Read WndManager to read existing bonus
+    mode = 0  # 0 = search for an array, 1 = tooltip, 2 = rate
+    with open(items_manager.path() + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as f:
+        for line in f.readlines():
+            line = line.strip().replace(u"\ufeff", "")
+            if mode == 0:
+                if line.startswith("static DST_STRING g_DstString[] ="):
+                    mode = 1
+                elif line.startswith("static constexpr int nDstRate[] = {"):
+                    mode = 2
+            else:
+                if line == "};":
+                    mode = 0
+                else:
+                    if mode == 1:  # Read dst types
+                        m = re.findall("(DST_[A-Z_]*)\\s*,\\s*([A-Z_]*)", line)
+
+                        if m is not None and len(m) != 0:
+                            tooltips[m[0][0]] = m[0][1]
+
+                    else:  # Read rates kind
+                        m = re.findall("(DST_[A-Z_]*)", line)
+                        if m is not None and len(m) != 0:
+                            tooltips_rate[m[0]] = True
+
+    # Search corresponding IDS with define
+    mode = 0
+    with open(items_manager.path() + "textClient.inc", encoding="utf-16-le") as f:
+        for line in f.readlines():
+            if mode == 0:
+                space_pos = line.find("0x")
+                tooltip = line[:space_pos].strip()
+
+                for t in tooltips:
+                    if tooltips[t] == tooltip:
+                        tooltip_id = t
+                        mode = 1
+                        break
+
+            elif mode == 1:
+                mode = 2
+            else:
+                tooltips[tooltip_id] = line.strip()
+                mode = 0
+
+    # Convert IDS to text
+    def replace_tooltip(identifier, text):
+        for tooltip_name in tooltips:
+            if tooltips[tooltip_name] == identifier:
+                tooltips[tooltip_name] = text
+
+    items_manager.read_text_file(items_manager.path() + "textClient.txt.txt", replace_tooltip)
+
+    return tooltips, tooltips_rate
+
+
+def serialize_bonus_types(item_list, bonus_types, bonus_types_rate):
+    def set_bonus_name(weapon):
+        weapon['Bonus_Serialization'] = []
+
+        for bonus_type, bonus_value in weapon['Bonus']:
+            if bonus_type in bonus_types:
+                bonus_type_serialized = bonus_types[bonus_type]
+            else:
+                bonus_type_serialized = bonus_type
+                bonus_types[bonus_type] = bonus_type
+
+            percent_mark = "%" if bonus_type in bonus_types_rate else ""
+
+            weapon['Bonus_Serialization'].append(bonus_type_serialized + " + " + str(bonus_value) + percent_mark)
+
+    for item_id in item_list:
+        set_bonus_name(item_list[item_id])
+
+    return 0
+
+
+def read_jobs():
+    # Read jobs names
+    job_names = {}
+
+    def define_job_names(identifier, value):
+        # Removes extra chracters before IDS
+        if not identifier.startswith("IDS"):
+            identifier = identifier[identifier.find("IDS"):]
+
+        job_names[identifier] = value
+
+    items_manager.read_text_file(items_manager.path() + "etc.txt.txt", define_job_names, "utf-16-le")
+
+    # Build jobs properties
+    jtype_with_symbols = {'JTYPE_MASTER': "-M", 'JTYPE_HERO': "-H"}
+
+    jobs = {}
+
+    with open(items_manager.path() + "etc.inc", encoding="utf-16-le") as f:
+        for line in f.readlines():
+            line = line.strip()
+            m = re.findall("(JOB_[A-Z_]*)\\s*(IDS_ETC_[A-Z_0-9]*)\\s*[A-Z_0-9]*\\s*(JTYPE_[A-Z]*)", line)
+
+            if m is None or len(m) == 0:
+                continue
+
+            m = m[0]
+
+            jobs[m[0]] = {
+                'Name': job_names[m[1]],
+                'ExtraSymbol': '' if m[2] not in jtype_with_symbols else jtype_with_symbols[m[2]]
+            }
+
+    return jobs
+
+
+# Builds image_path field in every item
+def compute_icons(item_list):
+    for item_id in item_list:
+        weapon = item_list[item_id]
+
+        if weapon['ICON_IMAGE'] is None:
+            weapon['image_path'] = ""
+            return
+
+        img = "Item\\" + weapon['ICON_IMAGE'][:-3] + "png"
+        weapon['image_path'] = img
+
+
+def classify(a, b):
+    return 0
+
+def serialize_items(a, job_list, b):
+    return 0
+
+def main():
+    arg_parser = make_arg_parser()
+    args_result = arg_parser.parse_args()
+
+    # Read propItem
+    item_list = items_manager.get_item_list()
+
+    # Read categories
+    item_kinds_3 = get_categorization_from_kind(args_result.kind)
+    flatten_item_kinds_3 = make_list_from_categorization(item_kinds_3)
+
+    # Filter items
+    item_list = filter_item_with_ik3(item_list, flatten_item_kinds_3)
+
+    # Replace item names
+    items_manager.read_text_file(items_manager.path() + "propItem.txt.txt",
+                                 lambda id, txt: replace_txt(item_list, id, txt))
+
+    # Serialize bonus types
+    bonus_types, bonus_types_rate = read_bonus_types()
+    serialize_bonus_types(item_list, bonus_types, bonus_types_rate)
+
+    # Icons
+    compute_icons(item_list)
+
+    # Legendary Emerald Volcano Terra Sun Zero Project
+    if items_manager.adjustForLEVTSZF():
+        items_manager.adjust_for_levtszf(item_list)
+
+    # Categorization
+    job_list = read_jobs()
+    serialization = serialize_items(item_list, job_list, args_result.edit)
+
+    classified_serialization = classify(serialization, item_kinds_3)
+
+
+    '''
+    for i in item_list:
+        print(item_list[i]['WEAPON_NAME'])
+    '''
+
+
+if __name__ == '__main__':
+    main()
+
+exit(0)
 
 js = len(sys.argv) >= 2 and sys.argv[1] == "JS"
 
@@ -15,271 +255,43 @@ def for_each_weapon(used_function):
             used_function(weapon)
 
 
-# Function to read .txt.txt files
-def read_text_file(file, replacement_function ,encoding="utf-16-le"):
-    with open(file, encoding=encoding) as f:
-        for line in f.readlines():
-            line.replace(chr(10), " ")
-            index = line.find(" ")
-            indextab = line.find("\t")
-            
-            if index == -1 and indextab == -1:
-                continue
-            
-            if indextab != -1:
-                if index == -1:
-                    index = indextab
-                else:
-                    index = min(index, indextab)
-            
-            identifier = line[0:index]
-            text = line[index:].strip()
-            
-            if text is None:
-                continue
-            
-            replacement_function(identifier, text)
-
-
-def add_types(dict, list):
-    for item in list:
-        dict[item] = []
-
-
-add_types(weapons_type, ['IK3_SWD', 'IK3_AXE', 'IK3_CHEERSTICK', 'IK3_KNUCKLEHAMMER', 'IK3_WAND', 'IK3_STAFF',
-                         'IK3_YOYO', 'IK3_BOW', 'IK3_CROSSBOW', 'IK3_SHIELD', 'IK3_MAGICBARUNA', 'IK3_ZEMBARUNA'])
-
-
-# Read propItem
-item_list = items_manager.get_item_list()
-
-for item_name in item_list:
-    item = item_list[item_name]
-    ik3 = item['IK3']
-    
-    if ik3 in weapons_type:
-        weapons_type[ik3].append(item)
-
-
-# Replace IDS name with real name
-def replace_txt(identifier, text):
-    for weapon_type in weapons_type:
-        for weapon in weapons_type[weapon_type]:
-            if weapon['TXT_NAME'] == identifier:
-                weapon['WEAPON_NAME'] = text
-
-
-read_text_file(items_manager.path() + "propItem.txt.txt", replace_txt)
-
-
-# Look for tooltip corresponding to dst
-tooltips = {}
-tooltips_rate = {}
-
-with open(items_manager.path() + "..\\Source\\_Interface\\WndManager.cpp", encoding="cp949") as f:
-    mode = 0  # 0 = search for an array, 1 = tooltip, 2 = rate
-    for line in f.readlines():
-        line = line.strip().replace(u"\ufeff", "")
-        if mode == 0:
-            if line.startswith("static DST_STRING g_DstString[] ="):
-                mode = 1
-            elif line.startswith("static constexpr int nDstRate[] = {"):
-                mode = 2
-        else:
-            if line == "};":
-                mode = 0
-            else:
-                if mode == 1:
-                
-                    m = re.findall("(DST_[A-Z_]*)\s*,\s*([A-Z_]*)", line)
-                    
-                    if m is not None and len(m) != 0:
-                        tooltips[m[0][0]] = m[0][1]
-                
-                else :
-                    m = re.findall("(DST_[A-Z_]*)", line)
-                    if m is not None and len(m) != 0:
-                        tooltips_rate[m[0]] = True
-
-mode = 0
-with open(items_manager.path() + "textClient.inc", encoding="utf-16-le") as f:
-    for line in f.readlines():
-        if mode == 0:
-            space_pos = line.find("0x")
-            tooltip = line[:space_pos].strip()
-            
-            for t in tooltips:
-                if tooltips[t] == tooltip:
-                    tooltip_id = t
-                    mode = 1
-                    break
-            
-        elif mode == 1:
-            mode = 2
-        else:
-            tooltips[tooltip_id] = line.strip()
-            mode = 0
-    
-    
-def replace_tooltip(identifier, text):
-    for tooltip_name in tooltips:
-        if tooltips[tooltip_name] == identifier:
-            tooltips[tooltip_name] = text
-
-
-read_text_file(items_manager.path() + "textClient.txt.txt", replace_tooltip)
-
-# Set jobs names
-job_names = {}
-def define_job_names(ident, value):
-    if not ident.startswith("IDS"):
-        ident = ident[ident.find("IDS"):]
-
-    job_names[ident] = value
-
-read_text_file(items_manager.path() + "etc.txt.txt", define_job_names, "utf-16-le")
-
-
-jtype_with_symbols = {'JTYPE_MASTER' : "-M", 'JTYPE_HERO' : "-H"}
-
-jobs = {}
-
-with open(items_manager.path() + "etc.inc", encoding="utf-16-le") as f:
-    for line in f.readlines():
-        line = line.strip()
-        m = re.findall("(JOB_[A-Z_]*)\s*(IDS_ETC_[A-Z_0-9]*)\s*[A-Z_0-9]*\s*(JTYPE_[A-Z]*)", line)
-
-        if m is None or len(m) == 0:
-            continue
-
-        m = m[0]
-
-        jobs[m[0]] = {
-            'Name': job_names[m[1]],
-            'ExtraSymbol': '' if m[2] not in jtype_with_symbols else jtype_with_symbols[m[2]]
-        }
-
-def set_bonus_name(weapon):
-    weapon['Bonus_Serialization'] = []
-    
-    for bonus_type, bonus_value in weapon['Bonus']:
-        if bonus_type in tooltips:
-            bonus_type_serialized = tooltips[bonus_type]
-        else:
-            bonus_type_serialized = bonus_type
-            tooltips[bonus_type] = bonus_type
-
-        percent_mark = "%" if bonus_type in tooltips_rate else ""
-
-        weapon['Bonus_Serialization'].append(bonus_type_serialized + " + " + str(bonus_value) + percent_mark)
-    
-
-for_each_weapon(set_bonus_name)
-
-# Convert icons to png file that the user has converted itself because python can't do it :>
-def compute_icon(weapon):
-    if weapon['ICON_IMAGE'] is None:
-        weapon['image_path'] = ""
-        return
-    
-    img = "Item\\" + weapon['ICON_IMAGE'][:-3] + "png"
-    weapon['image_path'] = img
-
-
-for_each_weapon(compute_icon)
-
-
 # Generate HTML
 
-jobs_values = [
-    ['JOB_VAGRANT', 'JOB_MERCENARY', 'JOB_ACROBAT', 'JOB_ASSIST', 'JOB_MAGICIAN',
-     'JOB_KNIGHT', 'JOB_BLADE', 'JOB_JESTER', 'JOB_RANGER',
-     'JOB_RINGMASTER', 'JOB_BILLPOSTER', 'JOB_PSYCHIKEEPER', 'JOB_ELEMENTOR'],
-    ['JOB_KNIGHT_MASTER', 'JOB_BLADE_MASTER', 'JOB_JESTER_MASTER', 'JOB_RANGER_MASTER',
-     'JOB_RINGMASTER_MASTER', 'JOB_BILLPOSTER_MASTER', 'JOB_PSYCHIKEEPER_MASTER', 'JOB_ELEMENTOR_MASTER'],
-    ['JOB_KNIGHT_HERO', 'JOB_BLADE_HERO', 'JOB_JESTER_HERO', 'JOB_RANGER_HERO',
-     'JOB_RINGMASTER_HERO', 'JOB_BILLPOSTER_HERO', 'JOB_PSYCHIKEEPER_HERO', 'JOB_ELEMENTOR_HERO'],
-    ['JOB_LORDTEMPLER_HERO', 'JOB_STORMBLADE_HERO', 'JOB_WINDLURKER_HERO', 'JOB_CRACKSHOOTER_HERO',
-     'JOB_FLORIST_HERO', 'JOB_FORCEMASTER_HERO', 'JOB_MENTALIST_HERO', 'JOB_ELEMENTORLORD_HERO'],
-    ['JOB_HERO']
-]
-
-def value_of_job(job_name):
-
-    for i in range(len(jobs_values)):
-        if job_name in jobs_values[i]:
-            return i
-
-    return -1
 
 
-def weapon_comparator(w):
-    return (w['DOUBLE_HANDED'], value_of_job(w['JOB']), w['OldLevel'], w['WEAPON_NAME'])
 
 
-if items_manager.adjustForLEVTSZF():
-    def legendary_emerald_volcano_terra_sun_zero_flyff_adjustements(w):
-        if w['JOB'].find("_MASTER") != -1 or w['JOB'].find("_HERO") != -1:
-            for list in jobs_values:
-                if w['JOB'] not in list:
-                    continue
+def append_one_weapon(dict, w):
+    bonuss = []
+    bonuss.extend(w['Bonus'])
+    while len(bonuss) != items_manager.nb_param():
+        bonuss.append(("=", 0))
 
-                index = list.index(w['JOB'])
-                w['JOB'] = jobs_values[0][index + 5]
-                break
-        w['OldLevel'] = w['Level']
-        
-        if w['Level'] <= 15:
-            w['Level'] = 1
-        elif w['Level'] < 60:
-            w['Level'] = int((w['Level'] - 15) / 3 + 5)
-        elif w['Level'] <= 125:
-            w['Level'] = w['Level'] - 40
-        else:
-            w['Level'] = 100
-
-    for_each_weapon(legendary_emerald_volcano_terra_sun_zero_flyff_adjustements)
+    dict.append({
+        'icon': w['image_path'],
+        'id': w['ID'],
+        'name': w['WEAPON_NAME'],
+        'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
+        'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
+        'bonus': '<br>'.join(w['Bonus_Serialization']),
+        'bonuss': bonuss
+    })
 
 
 def serialize_js(weapon_type):
-    dict = []
+    def weapon_comparator(w):
+        return w['DOUBLE_HANDED'], items_manager.value_of_job(w['JOB']),\
+               w['OldLevel'] if 'OldLevel' in w else w['Level'], w['WEAPON_NAME']
+
+    d = []
 
     weapons = sorted(weapon_type, key=weapon_comparator)
 
     for w in weapons:
-        bonuss = []
-        bonuss.extend(w['Bonus'])
-        while len(bonuss) != items_manager.nb_param():
-            bonuss.append(("=", 0))
-    
-        dict.append({
-            'icon': w['image_path'],
-            'id': w['ID'],
-            'name': w['WEAPON_NAME'],
-            'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
-            'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
-            'bonus': '<br>'.join(w['Bonus_Serialization']),
-            'bonuss': bonuss
-        })
+        append_one_weapon(d, w)
         
-    return dict
+    return d
 
-def serialize_no_js(weapon_type):
-    dict = []
-
-    weapons = sorted(weapon_type, key=weapon_comparator)
-
-    for w in weapons:
-        dict.append({
-            'icon': w['image_path'],
-            'id': w['ID'],
-            'name': w['WEAPON_NAME'],
-            'job': jobs[w['JOB']]['Name'] if w['JOB'] in jobs else w['JOB'],
-            'level': str(w['Level']) + jobs[w['JOB']]['ExtraSymbol'] if w['JOB'] in jobs else "",
-            'bonus': '<br>'.join(w['Bonus_Serialization'])
-        })
-        
-    return dict
 
 bonustypes = []
 
@@ -294,7 +306,7 @@ if js:
     
     template = 'template_js.htm'
 else:
-    serialize = serialize_no_js
+    serialize = serialize_js
     template = 'template.htm'
 
 
