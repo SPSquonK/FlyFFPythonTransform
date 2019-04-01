@@ -1,9 +1,3 @@
-import sys
-import re
-import string
-from collections import OrderedDict 
-from jinja2 import Environment, FileSystemLoader
-import os
 import items_manager
 
 item_manager = items_manager.get_item_manager()
