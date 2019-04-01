@@ -12,11 +12,11 @@
     {% for weapon in weapons %}
     <tr>
         <td><img src="{{ weapon.icon }}"></td>
-        <td>{{ weapon.id }}</td>
+        <td>{{ weapon.identifier }}</td>
         <td>{{ weapon.name }}</td>
-        <td>{{ weapon.job }}</td>
-        <td>{{ weapon.level }}</td>
-        <td>{{ weapon.bonus }}</td>
+        <td>{{ weapon.job_name }}</td>
+        <td>{{ weapon.real_level }}</td>
+        <td>{{ weapon.bonus_serialization }}</td>
     </tr>
     {% endfor %}
 </table>

@@ -30,6 +30,7 @@ JOBS_VALUE = [
 
 # --
 
+
 def getPropItemPath():
     global configuration
     load_configuration()

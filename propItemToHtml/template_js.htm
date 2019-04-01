@@ -14,25 +14,25 @@
     {% for weapon in weapons %}
     <tr>
         <td><img src="{{ weapon.icon }}"></td>
-        <td>{{ weapon.id }}</td>
+        <td>{{ weapon.identifier }}</td>
         <td>{{ weapon.name }}</td>
-        <td>{{ weapon.job }}</td>
-        <td>{{ weapon.level }}</td>
-        <td>{{ weapon.bonus }}</td>
+        <td>{{ weapon.job_name }}</td>
+        <td>{{ weapon.real_level }}</td>
+        <td>{{ weapon.bonus_serialization }}</td>
         <td>
         {% for i in range(nbparam) %}
             {% if i != 0 %}
                 <br>
             {% endif %}
-            <select id="BONUS_{{ i }}_{{ weapon.id }}" name="BONUS_{{ i }}_{{ weapon.id }}" onchange="changed_bonus('{{ weapon.id }}')">
+            <select id="BONUS_{{ i }}_{{ weapon.identifier }}" name="BONUS_{{ i }}_{{ weapon.identifier }}" onchange="changed_bonus('{{ weapon.identifier }}')">
             {% for bonustype in bonustypes %}
-                <option value="{{ bonustype['DST'] }}" {% if weapon.bonuss[i][0] == bonustype['DST'] %} selected {% endif %}>{{ bonustype['Name'] }}</option>
+                <option value="{{ bonustype['DST'] }}" {% if weapon.raw_bonus[i][0] == bonustype['DST'] %} selected {% endif %}>{{ bonustype['Name'] }}</option>
             {% endfor %}
             </select>
-            <input id="BONUSVAL_{{ i }}_{{ weapon.id }}" name="BONUSVAL_{{ i }}_{{ weapon.id }}" type="number" value="{{ weapon.bonuss[i][1] }}" onchange="changed_bonus('{{ weapon.id }}')">
+            <input id="BONUSVAL_{{ i }}_{{ weapon.identifier }}" name="BONUSVAL_{{ i }}_{{ weapon.identifier }}" type="number" value="{{ weapon.raw_bonus[i][1] }}" onchange="changed_bonus('{{ weapon.identifier }}')">
         {% endfor %}
         </td>
-        <td id="TXT_{{ weapon.id }}"></td>
+        <td id="TXT_{{ weapon.identifier }}"></td>
     </tr>
     {% endfor %}
 </table>

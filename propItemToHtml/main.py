@@ -3,8 +3,66 @@ import re
 from collections import OrderedDict 
 from jinja2 import Environment, FileSystemLoader
 import argparse
+from typing import Dict
 # Custom import
 import items_manager
+
+# ======================================================================================================================
+# ======================================================================================================================
+
+
+def find_job_tuple(job_identifier, job_table):
+    for job_class in range(len(job_table)):
+        job_class_list = job_table[job_class]
+
+        if job_identifier in job_class_list:
+            return job_class, job_class_list.index(job_identifier)
+
+    return -1, -1
+
+
+class ProcessedItem:
+    def __init__(self, item, job_list):
+        self.icon = item['image_path']
+        self.identifier = item['ID']
+        self.name = item['WEAPON_NAME']
+        self.item_kind = item['IK3']
+        self.hands = item['DOUBLE_HANDED']
+
+        # Level
+        self.original_level = int(item['OldLevel'])
+        self.real_level = item['Level']
+
+        if item['JOB'] in job_list:
+            self.display_level = str(item['Level']) + job_list[item['JOB']]['ExtraSymbol']
+        else:
+            self.display_level = str(item['Level'])
+
+        # Bonus
+        self.bonus_serialization = '<br>'.join(item['Bonus_Serialization'])
+
+        bonus_js = []
+        bonus_js.extend(item['Bonus'])
+        while len(bonus_js) != items_manager.nb_param():
+            bonus_js.append(("=", 0))
+        self.raw_bonus = bonus_js
+
+        # Job
+        self.job_name = job_list[item['JOB']]['Name'] if item['JOB'] in job_list else item['JOB']
+        self.job_tuple_id = find_job_tuple(item['JOB'], items_manager.JOBS_VALUE)
+
+    def get_weapon_key(self):
+        return self.hands, self.job_tuple_id, self.original_level, self.name
+
+    def is_an_item_kind_3(self, item_kind_3):
+        if isinstance(item_kind_3, str):
+            return self.item_kind == item_kind_3
+        else:
+            return self.item_kind in item_kind_3
+
+
+# ======================================================================================================================
+# ======================================================================================================================
 
 
 # Gives the list of IK3 to retrieve according to the given kind
@@ -39,18 +97,6 @@ def filter_item_with_ik3(item_list, flatten_item_kinds_3):
             new_item_list[item] = item_list[item]
 
     return new_item_list
-
-
-def make_arg_parser():
-    arg_parser = argparse.ArgumentParser(description="Creates a html page with every weapons or armors in the game")
-
-    arg_parser.add_argument('-e', '--edit', action='store_true',
-                            help='Generates several html page with edit options that generates '
-                            'the content of a file that the modify_bonus.py script can use to alter the source files.')
-    arg_parser.add_argument('-k', '--kind', choices=['weapons', 'armors'], default='weapons',
-                            help='Defines the kind of items that will be displayed')
-
-    return arg_parser
 
 
 # Replace IDS name with real name
@@ -217,46 +263,18 @@ def serialize_items(item_list, job_list):
         }
 
     serialized_list = {}
+    serialized_class = {}
 
     for item_id in item_list:
         serialized_list[item_id] = serialize_item(item_list[item_id])
+        serialized_class[item_id] = ProcessedItem(item_list[item_id], job_list)
 
-    return serialized_list
+    return serialized_list, serialized_class
 
 
-def classify(serialization, item_kinds_3):
-    def make_name(ik3):
-        if isinstance(ik3, str):
-            return ik3
-        else:
-            return "-".join(ik3)
-
-    def is_valid(this_item, ik3):
-        if isinstance(ik3, str):
-            return this_item['IK3'] == ik3
-        else:
-            return this_item['IK3'] in ik3
-
-    def item_comparator(w):
-        return w['DOUBLE_HANDED'], items_manager.value_of_job(w['JOB']),\
-            w['OldLevel'] if 'OldLevel' in w else w['Level'], w['WEAPON_NAME']
-
-    classifications = []
-
-    for i in range(len(item_kinds_3)):
-        ik3_group = item_kinds_3[i]
-        classification = {'Name': make_name(ik3_group), 'Items': []}
-
-        for item_id in serialization:
-            item = serialization[item_id]
-
-            if is_valid(item, ik3_group):
-                classification['Items'].append(item)
-
-        classification['Items'] = sorted(classification['Items'], key=item_comparator)
-        classifications.append(classification)
-
-    return classifications
+# ======================================================================================================================
+# ======================================================================================================================
+# -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING
 
 
 def write_page(j2_env, html_content, page_name='item_list.htm'):
@@ -290,6 +308,36 @@ def generate_html_edit(j2_env, template_page, classified_serialization, bonus_ty
         write_page(j2_env, html_content, "item_list_" + classification['Name'] + ".htm")
 
 
+# ======================================================================================================================
+# ======================================================================================================================
+# -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS  -- WEAPONS
+
+
+def classify(serialization: Dict[str, ProcessedItem], item_kinds_3):
+    def make_name(ik3):
+        if isinstance(ik3, str):
+            return ik3
+        else:
+            return "-".join(ik3)
+
+    classifications = []
+
+    for i in range(len(item_kinds_3)):
+        ik3_group = item_kinds_3[i]
+        classification = {'Name': make_name(ik3_group), 'Items': []}
+
+        for item_id in serialization:
+            item = serialization[item_id]
+
+            if item.is_an_item_kind_3(ik3_group):
+                classification['Items'].append(item)
+
+        classification['Items'] = sorted(classification['Items'], key=lambda weapon: weapon.get_weapon_key())
+        classifications.append(classification)
+
+    return classifications
+
+
 def finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
     classified_serialization = classify(serialization, item_kinds_3)
 
@@ -308,6 +356,7 @@ def finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_typ
 # ======================================================================================================================
 # ======================================================================================================================
 # -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS -- ARMORS
+
 
 def group_armor_by_sex(serialization):
     def modify_id(original_id, letter):
@@ -357,6 +406,7 @@ def group_armor_by_sex(serialization):
 
     return grouped
 
+
 def group_armor_by_category(serialization):
     constants = {'VALID_CHARACTER': "[0-9_A-Za-z]"}
     # We don't group id that doesn't follow the REGEX_M scheme
@@ -390,6 +440,7 @@ def group_armor_by_category(serialization):
             grouped[set_id][match_result[2]] = serialization[male_item_id]
 
     return grouped, solo
+
 
 def read_raw_data_set():
     # It's basically a bad automat but I'm too lazy to find one or properly develop one
@@ -624,6 +675,18 @@ def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_typ
 # -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN  -- MAIN
 
 
+def make_arg_parser():
+    arg_parser = argparse.ArgumentParser(description="Creates a html page with every weapons or armors in the game")
+
+    arg_parser.add_argument('-e', '--edit', action='store_true',
+                            help='Generates several html page with edit options that generates '
+                            'the content of a file that the modify_bonus.py script can use to alter the source files.')
+    arg_parser.add_argument('-k', '--kind', choices=['weapons', 'armors'], default='weapons',
+                            help='Defines the kind of items that will be displayed')
+
+    return arg_parser
+
+
 def main():
     arg_parser = make_arg_parser()
     args_result = arg_parser.parse_args()
@@ -655,10 +718,10 @@ def main():
 
     # Categorization
     job_list = read_jobs()
-    serialization = serialize_items(item_list, job_list)
+    serialization, serialization_class = serialize_items(item_list, job_list)
 
     if args_result.kind == 'weapons':
-        finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate)
+        finish_processing_weapon(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
     elif args_result.kind == 'armors':
         finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate)
 
