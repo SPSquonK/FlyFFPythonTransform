@@ -535,8 +535,7 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
             'Name': "",
             'Bonus': [],
             'Bonus_Serialized': [],
-            'Groups': [solo[i]],
-            'Solo': True
+            'Groups': [{'UniqueImte': solo[i]}]
         }
 
     # Groups
@@ -564,8 +563,7 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
                 'Name': "",
                 'Bonus': [],
                 'Bonus_Serialized': [],
-                'Groups': [grouped_items_by_category[group_key]],
-                'Solo': False
+                'Groups': [grouped_items_by_category[group_key]]
             }
             i = i + 1
         else:
@@ -574,8 +572,7 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
                     'Name': existing_set['Name'],
                     'Bonus': existing_set['bonus'],
                     'Bonus_Serialized': existing_set['Bonus_Serialization'],
-                    'Groups': [],
-                    'Solo': False
+                    'Groups': []
                 }
 
             matching[set_ids]['Groups'].append(grouped_items_by_category[group_key])
@@ -590,12 +587,9 @@ def group_comparator(g):
 def extract_one_item(set_groups):
     first_group = set_groups['Groups'][0]
 
-    if set_groups['Solo']:
-        return first_group[0]
-    else:
-        for item_group in first_group.values():
-            return item_group[0]
-        return None
+    for item_group in first_group.values():
+        return item_group[0]
+    return None
 
 
 def normalize_subgroups(group):
@@ -610,32 +604,21 @@ def normalize_subgroups(group):
 
     subgroups = []
     for subgroup in group['Groups']:
-        if group['Solo']:
-            subgroups.append([{
-                'male_icon': subgroup[0].icon,
-                'female_icon': subgroup[1].icon,
-                'male_name': subgroup[0].name,
-                'female_name': subgroup[1].name,
-                'male_identifier': subgroup[0].identifier,
-                'female_identifier': subgroup[1].identifier,
-                'bonus': subgroup[0].bonus_serialization,
-            }])
-        else:
-            l = []
+        l = []
 
-            for part_name in sorted(subgroup, key=order_parts):
-                part_item = subgroup[part_name]
-                l.append({
-                    'male_icon': part_item[0].icon,
-                    'female_icon': part_item[1].icon,
-                    'male_name': part_item[0].name,
-                    'female_name': part_item[1].name,
-                    'male_identifier': part_item[0].identifier,
-                    'female_identifier': part_item[1].identifier,
-                    'bonus': part_item[0].bonus_serialization,
-                })
+        for part_name in sorted(subgroup, key=order_parts):
+            part_item = subgroup[part_name]
+            l.append({
+                'male_icon': part_item[0].icon,
+                'female_icon': part_item[1].icon,
+                'male_name': part_item[0].name,
+                'female_name': part_item[1].name,
+                'male_identifier': part_item[0].identifier,
+                'female_identifier': part_item[1].identifier,
+                'bonus': part_item[0].bonus_serialization,
+            })
 
-            subgroups.append(l)
+        subgroups.append(l)
 
     return subgroups
 
@@ -653,8 +636,6 @@ def normalize_armors(j2_env, set_groups):
             'bonus': j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['Bonus_Serialized']),
             'subgroups': normalize_subgroups(group)
         })
-
-        print(j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['Bonus_Serialized']))
 
     return sorted(global_d, key=group_comparator)
 
@@ -692,10 +673,8 @@ def make_arg_parser():
                             'the content of a file that the modify_bonus.py script can use to alter the source files.')
     arg_parser.add_argument('-k', '--kind', choices=['weapons', 'armors'], default='weapons',
                             help='Defines the kind of items that will be displayed')
-    arg_parser.add_argument('-min', '--min_level', type=int,
-                            help='Minimal level of displayed items')
-    arg_parser.add_argument('-max', '--max_level', type=int,
-                            help='Maximal level of displayed items')
+    arg_parser.add_argument('-min', '--min_level', type=int, help='Minimal level of displayed items')
+    arg_parser.add_argument('-max', '--max_level', type=int, help='Maximal level of displayed items')
 
     return arg_parser
 
