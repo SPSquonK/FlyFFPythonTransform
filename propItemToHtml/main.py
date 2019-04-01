@@ -248,6 +248,26 @@ def serialize_items(item_list, job_list):
     return serialized_class
 
 
+def filter_level(item_list, min_level, max_level):
+    if min_level is None:
+        post_min_item_list = item_list
+    else:
+        post_min_item_list = OrderedDict()
+        for item_id in item_list:
+            if item_list[item_id]['Level'] >= min_level:
+                post_min_item_list[item_id] = item_list[item_id]
+
+    if max_level is None:
+        post_max_item_list = post_min_item_list
+    else:
+        post_max_item_list = OrderedDict()
+        for item_id in post_min_item_list:
+            if post_min_item_list[item_id]['Level'] <= max_level:
+                post_min_item_list[item_id] = post_min_item_list[item_id]
+
+    return post_max_item_list
+
+
 # ======================================================================================================================
 # ======================================================================================================================
 # -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING  -- HTML PAGE TEMPLATING
@@ -672,6 +692,10 @@ def make_arg_parser():
                             'the content of a file that the modify_bonus.py script can use to alter the source files.')
     arg_parser.add_argument('-k', '--kind', choices=['weapons', 'armors'], default='weapons',
                             help='Defines the kind of items that will be displayed')
+    arg_parser.add_argument('-min', '--min_level', type=int,
+                            help='Minimal level of displayed items')
+    arg_parser.add_argument('-max', '--max_level', type=int,
+                            help='Maximal level of displayed items')
 
     return arg_parser
 
@@ -681,7 +705,7 @@ def main():
     args_result = arg_parser.parse_args()
 
     # Read propItem
-    item_list = items_manager.get_item_list()
+    item_list = filter_level(items_manager.get_item_list(), args_result.min_level, args_result.max_level)
 
     # Read categories
     item_kinds_3 = get_categorization_from_kind(args_result.kind)
