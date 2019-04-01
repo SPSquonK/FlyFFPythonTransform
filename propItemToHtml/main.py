@@ -452,6 +452,7 @@ def read_raw_data_set():
 
     return d
 
+
 def write_set_name(raw_data):
     def replacement(identifier, value):
         if identifier in raw_data:
@@ -542,36 +543,38 @@ def group_comparator(g):
 
 
 def extract_one_item(set_groups):
-    first_group = set_groups['group'][0]
+    first_group = set_groups['Groups'][0]
 
-    if first_group['is_solo']:
-        return first_group['List'][0][0]
+    if set_groups['Solo']:
+        return first_group[0]
     else:
-        return first_group['List'][0][0][0]
+        for item_group in first_group.values():
+            return item_group[0]
+        return None
 
 
 def normalize_subgroups(group):
     subgroups = []
-
-    for subgroup in group['group']:
-        if subgroup['is_solo']:
+    for subgroup in group['Groups']:
+        if group['Solo']:
             subgroups.append([{
-                'male_icon': subgroup.item[0]['icon'],
-                'female_icon': subgroup.item[1]['icon'],
-                'male_name': subgroup.item[0]['name'],
-                'female_name': subgroup.item[1]['name'],
-                'bonus': subgroup.item[0]['Bonus_Serialized'],
+                'male_icon': subgroup[0]['icon'],
+                'female_icon': subgroup[1]['icon'],
+                'male_name': subgroup[0]['name'],
+                'female_name': subgroup[1]['name'],
+                'bonus': subgroup[0]['bonus'],
             }])
         else:
             l = []
 
-            for proper_item_set in subgroup['group']:
+            for part_name in subgroup:
+                part_item = subgroup[part_name]
                 l.append({
-                    'male_icon': proper_item_set.item[0]['icon'],
-                    'female_icon': proper_item_set.item[1]['icon'],
-                    'male_name': proper_item_set.item[0]['name'],
-                    'female_name': proper_item_set.item[1]['name'],
-                    'bonus': proper_item_set.item[0]['Bonus_Serialized'],
+                    'male_icon': part_item[0]['icon'],
+                    'female_icon': part_item[1]['icon'],
+                    'male_name': part_item[0]['name'],
+                    'female_name': part_item[1]['name'],
+                    'bonus': part_item[0]['bonus'],
                 })
 
             subgroups.append(l)
@@ -584,18 +587,16 @@ def normalize_armors(set_groups):
 
     for group_id in set_groups:
         group = set_groups[group_id]
-        one_item = extract_one_item(set_groups[group_id])
-
+        one_item = extract_one_item(group)
         global_d.append({
             'name': group['Name'],
             'level': one_item['Level'],
             'job': one_item['job'],
-            'bonus': group['Serialized_Bonus'],
+            'bonus': group['Bonus_Serialized'],  # bonuss
             'subgroups': normalize_subgroups(group)
         })
 
     return sorted(global_d, key=group_comparator)
-
 
 
 def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
@@ -609,11 +610,13 @@ def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_typ
     # Matching groups with sets
     set_groups = match_group_and_sets(solo, grouped_items_by_category, existing_sets)
 
-    # TODO : Make the template
     j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-    # normalized_armors = normalize_armors(set_groups) includes sorted(set_groups, key=group_comparator)
-    # code = j2_env.get_template('general_template.htm').render(groups=normalized_armors, bonus_types=bonus_types)
-    # write_page(j2_env, code, 'armor_list.html')
+    normalized_armors = normalize_armors(set_groups)
+
+    code = j2_env.get_template('template_armors.htm').render(groups=normalized_armors, bonus_types=bonus_types)
+    f = open(items_manager.THIS_DIR + "armor_list.html", "w+")
+    f.write(code)
+    f.close()
 
 
 # ======================================================================================================================

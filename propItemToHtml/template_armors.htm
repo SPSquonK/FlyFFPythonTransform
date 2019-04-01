@@ -1,33 +1,67 @@
+<!doctype HTML>
+<html>
+	<head>
+        <style>
+            .first_col {
+                width: 400px;
+                vertical-align: top;
+            }
+            .second_col {
+                width: 1000px;
+            }
+            .icon_col {
+                width: 40px;
+                text-align: center;
+            }
+            .name_col {
+                width: 240px;
+                text-align: center;
+            }
+            .bonus_col {
+                width: 440px;
+                text-align:center;
+            }
 
-{% for group in groups %}
+            .borderino {
+                border: 2px black solid;
+                border-collapse: collapse;
+            }
+        </style>
+	</head>
+	<body>
 
-<table>
-    <tr>
-        <td>{{ group.name }}<br>{{ group.level }}<br>{{ group.job }}</td>
-        <td>{{ group.bonus }}</td>
-    </tr>
-    <tr>
-        <table>
-            {% for subgroup in group.subgroups %}
-                <tr>
-                    <td>
-                        <table>
-                            {% for category in subgroup %}
-                                <tr>
-                                    <td><img src="{{ category.maleicon }}"></td>
-                                    <td>{{ category.malename }}</td>
-                                    <td>{{ category.bonus }}</td>
-                                    <td>{{ category.femalename }}</td>
-                                    <td><img src="{{ category.femaleicon }}"></td>
-                                </tr>
-                            {% endfor %}
-                        </table>
-                        
-                    </td>
-                </tr>
-            {% endfor %}
+    {% for group in groups %}
+        <table class="borderino" style="margin-bottom: 20px">
+            <tr>
+                <td class="first_col">
+                    {{ group['name'] }}
+                    <br>Niveau {{ group['level'] }}
+                    <br>{{ group['job'] }}
+                    <br>{{ group['bonus'] }}
+                </td>
+                <td class="second_col borderino">
+                    <table>
+                        {% for subgroup in group['subgroups'] %}
+                            <tr>
+                                <td>
+                                    <table style="width: 100%">
+                                        {% for category in subgroup %}
+                                            <tr>
+                                                <td class="icon_col"><img src="{{ category.male_icon }}"></td>
+                                                <td class="name_col">{{ category.male_name }}</td>
+                                                <td class="bonus_col">{{ category.bonus }}</td>
+                                                <td class="name_col">{{ category.female_name }}</td>
+                                                <td class="icon_col"><img src="{{ category.female_icon }}"></td>
+                                            </tr>
+                                        {% endfor %}
+                                    </table>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </td>
+            </tr>
         </table>
-    </tr>
-</table>
-
-{% endfor %}
+    {% endfor %}
+    </body>
+</html>
