@@ -544,19 +544,17 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
         }
 
     # Groups
-    def flatten_item(item_arrangment):
+    def flatten_item(item_arrangement):
         item_list_male = []
-        item_list_female = []
 
-        for key in item_arrangment:
-            item_list_male.append(item_arrangment[key][0]['id'])
-            item_list_female.append(item_arrangment[key][1]['id'])
+        for key in item_arrangement:
+            item_list_male.append(item_arrangement[key][0].identifier)
 
-        return item_list_male, item_list_female
+        return item_list_male
 
     i = 0
     for group_key in grouped_items_by_category:
-        components_m, components_f = flatten_item(grouped_items_by_category[group_key])
+        components_m = flatten_item(grouped_items_by_category[group_key])
 
         is_ok = False
         for set_ids in existing_sets:
@@ -605,27 +603,40 @@ def extract_one_item(set_groups):
 
 
 def normalize_subgroups(group):
+    def order_parts(part):
+        order_map = {
+            'HELMET': 0,
+            'SUIT': 1,
+            'GAUNTLET': 2,
+            'BOOTS': 3
+        }
+        return order_map[part] if part in order_map else 4
+
     subgroups = []
     for subgroup in group['Groups']:
         if group['Solo']:
             subgroups.append([{
-                'male_icon': subgroup[0]['icon'],
-                'female_icon': subgroup[1]['icon'],
-                'male_name': subgroup[0]['name'],
-                'female_name': subgroup[1]['name'],
-                'bonus': subgroup[0]['bonus'],
+                'male_icon': subgroup[0].icon,
+                'female_icon': subgroup[1].icon,
+                'male_name': subgroup[0].name,
+                'female_name': subgroup[1].name,
+                'male_identifier': subgroup[0].identifier,
+                'female_identifier': subgroup[1].identifier,
+                'bonus': subgroup[0].bonus_serialization,
             }])
         else:
             l = []
 
-            for part_name in subgroup:
+            for part_name in sorted(subgroup, key=order_parts):
                 part_item = subgroup[part_name]
                 l.append({
-                    'male_icon': part_item[0]['icon'],
-                    'female_icon': part_item[1]['icon'],
-                    'male_name': part_item[0]['name'],
-                    'female_name': part_item[1]['name'],
-                    'bonus': part_item[0]['bonus'],
+                    'male_icon': part_item[0].icon,
+                    'female_icon': part_item[1].icon,
+                    'male_name': part_item[0].name,
+                    'female_name': part_item[1].name,
+                    'male_identifier': part_item[0].identifier,
+                    'female_identifier': part_item[1].identifier,
+                    'bonus': part_item[0].bonus_serialization,
                 })
 
             subgroups.append(l)
@@ -638,11 +649,11 @@ def normalize_armors(set_groups):
 
     for group_id in set_groups:
         group = set_groups[group_id]
-        one_item = extract_one_item(group)
+        one_item: ProcessedItem = extract_one_item(group)  # TODO : mythical set
         global_d.append({
             'name': group['Name'],
-            'level': one_item['Level'],
-            'job': one_item['job'],
+            'level': one_item.original_level,
+            'job': one_item.job_name,
             'bonus': group['Bonus_Serialized'],  # bonuss
             'subgroups': normalize_subgroups(group)
         })
@@ -723,7 +734,7 @@ def main():
     if args_result.kind == 'weapons':
         finish_processing_weapon(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
     elif args_result.kind == 'armors':
-        finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate)
+        finish_processing_armors(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
 
 
 if __name__ == '__main__':

@@ -12,6 +12,7 @@
             .icon_col {
                 width: 40px;
                 text-align: center;
+                background-color: #FF00FF;
             }
             .name_col {
                 width: 240px;
@@ -25,6 +26,10 @@
             .borderino {
                 border: 2px black solid;
                 border-collapse: collapse;
+            }
+
+            span.small {
+                font-size: 0.7em;
             }
         </style>
 	</head>
@@ -48,9 +53,15 @@
                                         {% for category in subgroup %}
                                             <tr>
                                                 <td class="icon_col"><img src="{{ category.male_icon }}"></td>
-                                                <td class="name_col">{{ category.male_name }}</td>
+                                                <td class="name_col">
+                                                    <span class="small">{{ category.male_identifier }}</span>
+                                                    <br>{{ category.male_name }}
+                                                </td>
                                                 <td class="bonus_col">{{ category.bonus }}</td>
-                                                <td class="name_col">{{ category.female_name }}</td>
+                                                <td class="name_col">
+                                                    <span class="small">{{ category.female_identifier }}</span>
+                                                    <br>{{ category.female_name }}
+                                                </td>
                                                 <td class="icon_col"><img src="{{ category.female_icon }}"></td>
                                             </tr>
                                         {% endfor %}
