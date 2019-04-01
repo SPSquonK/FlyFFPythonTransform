@@ -66,6 +66,6 @@ Jinja2 is used to generate the pages : `pip install Jinja2`
 
 ## Licence
 
-This subproject uses JQuery 3.3.1 which is distributed under the MIT Licence. You can read its licence here : https://jquery.org/license
+This subproject includes JQuery 3.3.1 which is distributed under the MIT Licence. You can read its licence here : https://jquery.org/license
 
-Everything else is distributed with the same licence as other subprojects of this repo
+The project itself is also distributed under the MIT Licence.
