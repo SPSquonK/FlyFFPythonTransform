@@ -38,11 +38,10 @@
     {% for group in groups %}
         <table class="borderino" style="margin-bottom: 20px">
             <tr>
-                <td class="first_col">
-                    {{ group['name'] }}
-                    <br>Niveau {{ group['level'] }}
-                    <br>{{ group['job'] }}
-                    <br>{{ group['bonus'] }}
+                <td class="first_col" style="text-align: center;">
+                    <p style="background-color: lightgrey;"><strong>{{ group['name'] }}
+                    <br>Niveau {{ group['level'] }} - {{ group['job'] }}</strong></p>
+                    {{ group['bonus'] }}
                 </td>
                 <td class="second_col borderino">
                     <table>

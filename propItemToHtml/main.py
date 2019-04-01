@@ -240,36 +240,12 @@ def compute_icons(item_list):
 
 
 def serialize_items(item_list, job_list):
-    def serialize_item(item):
-        bonus_js = []
-        bonus_js.extend(item['Bonus'])
-        while len(bonus_js) != items_manager.nb_param():
-            bonus_js.append(("=", 0))
-
-        return {
-            'icon': item['image_path'],
-            'id': item['ID'],
-            'IK3': item['IK3'],
-            'DOUBLE_HANDED': item['DOUBLE_HANDED'],
-            'JOB': item['JOB'],
-            'OldLevel': item['OldLevel'],
-            'Level': item['Level'],
-            'name': item['WEAPON_NAME'],
-            'WEAPON_NAME': item['WEAPON_NAME'],
-            'job': job_list[item['JOB']]['Name'] if item['JOB'] in job_list else item['JOB'],
-            'level': str(item['Level']) + job_list[item['JOB']]['ExtraSymbol'] if item['JOB'] in job_list else "",
-            'bonus': '<br>'.join(item['Bonus_Serialization']),
-            'bonuss': bonus_js
-        }
-
-    serialized_list = {}
     serialized_class = {}
 
     for item_id in item_list:
-        serialized_list[item_id] = serialize_item(item_list[item_id])
         serialized_class[item_id] = ProcessedItem(item_list[item_id], job_list)
 
-    return serialized_list, serialized_class
+    return serialized_class
 
 
 # ======================================================================================================================
@@ -515,7 +491,7 @@ def write_set_name(raw_data):
 def serialize_bonus(raw_data, bonus_types, bonus_types_rate):
     for armor_set_ids in raw_data:
         armor_set = raw_data[armor_set_ids]
-        armor_set['Bonus_Serialization'] = {2:[], 3:[], 4:[]}
+        armor_set['Bonus_Serialization'] = {2: [], 3: [], 4: []}
         for bonus_group in armor_set['bonus']:
             if bonus_group[0] in (2, 3, 4):
                 serial = get_bonus_serialization(bonus_group[1], bonus_group[2], bonus_types, bonus_types_rate)
@@ -644,7 +620,7 @@ def normalize_subgroups(group):
     return subgroups
 
 
-def normalize_armors(set_groups):
+def normalize_armors(j2_env, set_groups):
     global_d = []
 
     for group_id in set_groups:
@@ -654,14 +630,16 @@ def normalize_armors(set_groups):
             'name': group['Name'],
             'level': one_item.original_level,
             'job': one_item.job_name,
-            'bonus': group['Bonus_Serialized'],  # bonuss
+            'bonus': j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['Bonus_Serialized']),
             'subgroups': normalize_subgroups(group)
         })
+
+        print(j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['Bonus_Serialized']))
 
     return sorted(global_d, key=group_comparator)
 
 
-def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
+def finish_processing_armors(serialization, args_result, bonus_types, bonus_types_rate):
     # Existing sets
     existing_sets = read_existing_sets(bonus_types, bonus_types_rate)
 
@@ -673,7 +651,7 @@ def finish_processing_armors(serialization, item_kinds_3, args_result, bonus_typ
     set_groups = match_group_and_sets(solo, grouped_items_by_category, existing_sets)
 
     j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-    normalized_armors = normalize_armors(set_groups)
+    normalized_armors = normalize_armors(j2_env, set_groups)
 
     code = j2_env.get_template('template_armors.htm').render(groups=normalized_armors, bonus_types=bonus_types)
     f = open(items_manager.THIS_DIR + "armor_list.html", "w+")
@@ -729,12 +707,12 @@ def main():
 
     # Categorization
     job_list = read_jobs()
-    serialization, serialization_class = serialize_items(item_list, job_list)
+    serialization_class = serialize_items(item_list, job_list)
 
     if args_result.kind == 'weapons':
         finish_processing_weapon(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
     elif args_result.kind == 'armors':
-        finish_processing_armors(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
+        finish_processing_armors(serialization_class, args_result, bonus_types, bonus_types_rate)
 
 
 if __name__ == '__main__':
