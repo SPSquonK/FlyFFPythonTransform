@@ -489,7 +489,7 @@ def group_armor_by_category(serialization):
 
 
 def read_raw_data_set():
-    # It's basically a bad automat but I'm too lazy to find one or properly develop one
+    # It's basically a bad automata but I'm too lazy to find one or properly develop one
     # states = ['SetItem', '/*', 'SetItem{', 'ElemOrAvail', 'Elem{', 'InElem', 'Avail{', 'InAvail']
     d = {}
     state = 'SetItem'
@@ -508,10 +508,10 @@ def read_raw_data_set():
                 if line.startswith('/*'):
                     state = '/*'
                 else:
-                    m = re.findall("\\s*SetItem\\s*[0-9]*\\s*([A-Z0-9_a-z]*)(\\s*.*)?", line)
+                    m = re.findall("\\s*SetItem\\s*([0-9]*)\\s*([A-Z0-9_a-z]*)(\\s*.*)?", line)
                     if m is not None and len(m) > 0:
-                        current_ids = m[0][0]
-                        d[current_ids] = {'parts': [], 'bonus': []}
+                        current_ids = m[0][1]
+                        d[current_ids] = {'parts': [], 'bonus': [], 'set_id': int(m[0][0])}
                         state = 'SetItem{'
             elif state == '/*':
                 if line.find('*/') != -1:
@@ -605,7 +605,7 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
 
         for key in item_arrangement:
             item_list_male.append(item_arrangement[key][0].identifier)
-            item_list_female.append(item_arrangement[key][0].identifier)
+            item_list_female.append(item_arrangement[key][1].identifier)
 
         return item_list_male, item_list_female
 
@@ -632,7 +632,8 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
                     'Bonus': existing_set['bonus'],
                     'Bonus_Serialized': existing_set['Bonus_Serialization'],
                     'Groups': [],
-                    'SetId': (corresponding_set_id, find_corresponding_set(components_f, existing_sets))
+                    'SetId': (existing_set['set_id'],
+                              existing_sets[find_corresponding_set(components_f, existing_sets)]['set_id'])
                 }
 
             matching[corresponding_set_id]['Groups'].append(grouped_items_by_category[group_key])
@@ -701,7 +702,7 @@ def normalize_armors(j2_env, set_groups, build_bonus_form):
     # Rewrite bonus for editing
     if build_bonus_form is not None:
         def convert_to_bonus(bonus_list, nb_part):
-            identifier = "SET_" + str(bonus_list[0][0]) + "_" + str(bonus_list[0][1] + "_" + str(nb_part))
+            identifier = "SET_" + str(bonus_list[0][0]) + "_" + str(bonus_list[0][1]) + "_" + str(nb_part)
 
             bonus = []
             for triple in bonus_list[1]:
