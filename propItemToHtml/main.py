@@ -22,7 +22,7 @@ def find_job_tuple(job_identifier, job_table):
 
 
 class ProcessedItem:
-    def __init__(self, item, job_list):
+    def __init__(self, item, job_list, bonus_for_form, build_form=True):
         self.icon = item['image_path']
         self.identifier = item['ID']
         self.name = item['WEAPON_NAME']
@@ -47,6 +47,9 @@ class ProcessedItem:
             bonus_js.append(("=", 0))
         self.raw_bonus = bonus_js
 
+        if build_form:
+            self.bonus_form = ProcessedFormBonus(self.identifier, self.raw_bonus).template(bonus_for_form)
+
         # Job
         self.job_name = job_list[item['JOB']]['Name'] if item['JOB'] in job_list else item['JOB']
         self.job_tuple_id = find_job_tuple(item['JOB'], items_manager.JOBS_VALUE)
@@ -59,6 +62,23 @@ class ProcessedItem:
             return self.item_kind == item_kind_3
         else:
             return self.item_kind in item_kind_3
+
+
+class ProcessedFormBonus:
+    html_template = None
+
+    def __init__(self, identifier, bonus):
+        self.identifier = identifier
+        self.bonus = bonus
+
+    @staticmethod
+    def load_template(j2_env):
+        ProcessedFormBonus.html_template = j2_env.get_template('template_form_bonus.htm')
+
+    def template(self, bonus_kinds):
+        if ProcessedFormBonus.html_template is None:
+            raise Exception('No html template loaded')
+        return ProcessedFormBonus.html_template.render(identifier=self.identifier, bonus=self.bonus, types=bonus_kinds)
 
 
 # ======================================================================================================================
@@ -239,33 +259,61 @@ def compute_icons(item_list):
         weapon['image_path'] = img
 
 
-def serialize_items(item_list, job_list):
+def serialize_items(item_list, job_list, bonus_types, do_edit):
     serialized_class = {}
 
+    if do_edit is None:
+        do_edit = False
+
     for item_id in item_list:
-        serialized_class[item_id] = ProcessedItem(item_list[item_id], job_list)
+        serialized_class[item_id] = ProcessedItem(item_list[item_id], job_list, bonus_types, do_edit)
 
     return serialized_class
 
 
 def filter_level(item_list, min_level, max_level):
-    if min_level is None:
-        post_min_item_list = item_list
-    else:
-        post_min_item_list = OrderedDict()
-        for item_id in item_list:
-            if item_list[item_id]['Level'] >= min_level:
-                post_min_item_list[item_id] = item_list[item_id]
+    # Build function
+    def filter_function_min(item):
+        return item['Level'] >= min_level
 
-    if max_level is None:
-        post_max_item_list = post_min_item_list
-    else:
-        post_max_item_list = OrderedDict()
-        for item_id in post_min_item_list:
-            if post_min_item_list[item_id]['Level'] <= max_level:
-                post_min_item_list[item_id] = post_min_item_list[item_id]
+    def filter_function_max(item):
+        return item['Level'] <= max_level
 
-    return post_max_item_list
+    def filter_function_both(item):
+        return min_level <= item['Level'] <= max_level
+
+    # Determine function
+    if min_level is not None:
+        if max_level is not None:
+            filter_function = filter_function_both
+        else:
+            filter_function = filter_function_min
+    else:
+        if max_level is not None:
+            filter_function = filter_function_max
+        else:
+            return item_list
+
+    new_item_list = OrderedDict()
+    for item_id in item_list:
+        if filter_function(item_list[item_id]):
+            new_item_list[item_id] = item_list[item_id]
+    return new_item_list
+
+
+def filter_jobs(item_list, jobs):
+    if jobs is None:
+        return item_list
+
+    filtered = OrderedDict()
+
+    for item_identifier in item_list:
+        item = item_list[item_identifier]
+
+        if item['JOB'] in jobs:
+            filtered[item_identifier] = item
+
+    return filtered
 
 
 # ======================================================================================================================
@@ -280,27 +328,26 @@ def write_page(j2_env, html_content, page_name='item_list.htm'):
     f.close()
 
 
-def fill_template(j2_env, template, classification, bonus_types):
+def fill_template(j2_env, template, classification):
     ik3 = classification['Name']
     weapons = classification['Items']
 
     title = ik3 + " " + str(len(weapons)) + " items"
 
-    return j2_env.get_template(template).render(weaponname=title, weapons=weapons,
-                                                bonustypes=bonus_types, nbparam=items_manager.nb_param())
+    return j2_env.get_template(template).render(weaponname=title, weapons=weapons)
 
 
 def generate_html(j2_env, template_page, classified_serialization):
     html_code = []
     for i in range(len(classified_serialization)):
-        html_code.append(fill_template(j2_env, template_page, classified_serialization[i], None))
+        html_code.append(fill_template(j2_env, template_page, classified_serialization[i]))
     write_page(j2_env, "\r\n".join(html_code))
 
 
-def generate_html_edit(j2_env, template_page, classified_serialization, bonus_types):
+def generate_html_edit(j2_env, template_page, classified_serialization):
     for i in range(len(classified_serialization)):
         classification = classified_serialization[i]
-        html_content = fill_template(j2_env, template_page, classification, bonus_types)
+        html_content = fill_template(j2_env, template_page, classification)
         write_page(j2_env, html_content, "item_list_" + classification['Name'] + ".htm")
 
 
@@ -334,19 +381,22 @@ def classify(serialization: Dict[str, ProcessedItem], item_kinds_3):
     return classifications
 
 
-def finish_processing_weapon(serialization, item_kinds_3, args_result, bonus_types, bonus_types_rate):
+def make_bonus_list(bonus_types, bonus_types_rate):
+    bonus_types_js = [{'DST': '=', 'Name': ''}]
+    for bonus_type in bonus_types:
+        percent = " (%)" if bonus_type in bonus_types_rate else ""
+        bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
+    return bonus_types_js
+
+
+def finish_processing_weapon(j2_env, serialization, item_kinds_3, args_result):
     classified_serialization = classify(serialization, item_kinds_3)
 
     # Page Generation
-    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
     generate_html(j2_env, 'template.htm', classified_serialization)
 
     if args_result.edit:
-        bonus_types_js = [{'DST': '=', 'Name': ''}]
-        for bonus_type in bonus_types:
-            percent = " (%)" if bonus_type in bonus_types_rate else ""
-            bonus_types_js.append({'DST': bonus_type, 'Name': bonus_types[bonus_type] + percent})
-        generate_html_edit(j2_env, 'template_js.htm', classified_serialization, bonus_types_js)
+        generate_html_edit(j2_env, 'template_js.htm', classified_serialization)
 
 
 # ======================================================================================================================
@@ -526,6 +576,15 @@ def read_existing_sets(bonus_types, bonus_types_rate):
     return raw_data
 
 
+def find_corresponding_set(components, existing_sets):
+    for set_ids in existing_sets:
+        existing_set = existing_sets[set_ids]
+        if set(components).issubset(set(existing_set['parts'])):
+            return set_ids
+
+    return None
+
+
 def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
     matching = {}
 
@@ -535,47 +594,48 @@ def match_group_and_sets(solo, grouped_items_by_category, existing_sets):
             'Name': "",
             'Bonus': [],
             'Bonus_Serialized': [],
-            'Groups': [{'UniqueImte': solo[i]}]
+            'Groups': [{'UniqueImte': solo[i]}],
+            'SetId': None
         }
 
     # Groups
     def flatten_item(item_arrangement):
         item_list_male = []
+        item_list_female = []
 
         for key in item_arrangement:
             item_list_male.append(item_arrangement[key][0].identifier)
+            item_list_female.append(item_arrangement[key][0].identifier)
 
-        return item_list_male
+        return item_list_male, item_list_female
 
     i = 0
     for group_key in grouped_items_by_category:
-        components_m = flatten_item(grouped_items_by_category[group_key])
+        components_m, components_f = flatten_item(grouped_items_by_category[group_key])
 
-        is_ok = False
-        for set_ids in existing_sets:
-            existing_set = existing_sets[set_ids]
-            if set(components_m).issubset(set(existing_set['parts'])):
-                is_ok = True
-                break
+        corresponding_set_id = find_corresponding_set(components_m, existing_sets)
 
-        if not is_ok:
+        if corresponding_set_id is None:
             matching['GroupItem' + str(i)] = {
                 'Name': "",
                 'Bonus': [],
                 'Bonus_Serialized': [],
-                'Groups': [grouped_items_by_category[group_key]]
+                'Groups': [grouped_items_by_category[group_key]],
+                'SetId': None
             }
             i = i + 1
         else:
-            if set_ids not in matching:
-                matching[set_ids] = {
+            if corresponding_set_id not in matching:
+                existing_set = existing_sets[corresponding_set_id]
+                matching[corresponding_set_id] = {
                     'Name': existing_set['Name'],
                     'Bonus': existing_set['bonus'],
                     'Bonus_Serialized': existing_set['Bonus_Serialization'],
-                    'Groups': []
+                    'Groups': [],
+                    'SetId': (corresponding_set_id, find_corresponding_set(components_f, existing_sets))
                 }
 
-            matching[set_ids]['Groups'].append(grouped_items_by_category[group_key])
+            matching[corresponding_set_id]['Groups'].append(grouped_items_by_category[group_key])
 
     return matching
 
@@ -623,7 +683,7 @@ def normalize_subgroups(group):
     return subgroups
 
 
-def normalize_armors(j2_env, set_groups):
+def normalize_armors(j2_env, set_groups, build_bonus_form):
     global_d = []
 
     for group_id in set_groups:
@@ -632,15 +692,47 @@ def normalize_armors(j2_env, set_groups):
         global_d.append({
             'name': group['Name'],
             'level': one_item.original_level,
-            'job': one_item.job_name,
-            'bonus': j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['Bonus_Serialized']),
+            'job': one_item.job_name if len(group['Groups']) == 1 else '*',
+            'raw_bonus': (group['SetId'], group['Bonus']),
+            'bonus': group['Bonus_Serialized'],
             'subgroups': normalize_subgroups(group)
         })
+
+    # Rewrite bonus for editing
+    if build_bonus_form is not None:
+        def convert_to_bonus(bonus_list, nb_part):
+            identifier = "SET_" + str(bonus_list[0][0]) + "_" + str(bonus_list[0][1] + "_" + str(nb_part))
+
+            bonus = []
+            for triple in bonus_list[1]:
+                nb_part_triple, dst_triple, dst_value = triple
+                if nb_part_triple == nb_part:
+                    bonus.append((dst_triple, dst_value))
+
+            while len(bonus) != items_manager.nb_param():
+                bonus.append(('=', 0))
+
+            return ProcessedFormBonus(identifier, bonus)
+
+        for group in global_d:
+            if group['raw_bonus'][0] is None:
+                group['bonus'] = ''
+            else:
+                group['bonus'] = {
+                    2: [convert_to_bonus(group['raw_bonus'], 2).template(build_bonus_form)],
+                    3: [convert_to_bonus(group['raw_bonus'], 3).template(build_bonus_form)],
+                    4: [convert_to_bonus(group['raw_bonus'], 4).template(build_bonus_form)]
+                }
+
+    # Template bonus
+    for group in global_d:
+        if group['bonus'] != '':
+            group['bonus'] = j2_env.get_template('template_armors_setbonus.htm').render(bonus=group['bonus'])
 
     return sorted(global_d, key=group_comparator)
 
 
-def finish_processing_armors(serialization, args_result, bonus_types, bonus_types_rate):
+def finish_processing_armors(j2_env, serialization, args_result, bonus_types, bonus_types_rate):
     # Existing sets
     existing_sets = read_existing_sets(bonus_types, bonus_types_rate)
 
@@ -651,8 +743,11 @@ def finish_processing_armors(serialization, args_result, bonus_types, bonus_type
     # Matching groups with sets
     set_groups = match_group_and_sets(solo, grouped_items_by_category, existing_sets)
 
-    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
-    normalized_armors = normalize_armors(j2_env, set_groups)
+    build_bonus_form = None
+    if args_result.edit:
+        build_bonus_form = make_bonus_list(bonus_types, bonus_types_rate)
+
+    normalized_armors = normalize_armors(j2_env, set_groups, build_bonus_form)
 
     code = j2_env.get_template('template_armors.htm').render(groups=normalized_armors, bonus_types=bonus_types)
     f = open(items_manager.THIS_DIR + "armor_list.html", "w+")
@@ -675,6 +770,9 @@ def make_arg_parser():
                             help='Defines the kind of items that will be displayed')
     arg_parser.add_argument('-min', '--min_level', type=int, help='Minimal level of displayed items')
     arg_parser.add_argument('-max', '--max_level', type=int, help='Maximal level of displayed items')
+    arg_parser.add_argument('-j', '--job', action="append", help='Filter displayed items with given jobs. '
+                                                                 'Several jobs can be specified by using several times '
+                                                                 'this option.')
 
     return arg_parser
 
@@ -685,6 +783,7 @@ def main():
 
     # Read propItem
     item_list = filter_level(items_manager.get_item_list(), args_result.min_level, args_result.max_level)
+    item_list = filter_jobs(item_list, args_result.job)
 
     # Read categories
     item_kinds_3 = get_categorization_from_kind(args_result.kind)
@@ -710,12 +809,17 @@ def main():
 
     # Categorization
     job_list = read_jobs()
-    serialization_class = serialize_items(item_list, job_list)
+
+    bonus_types_js = make_bonus_list(bonus_types, bonus_types_rate)
+    j2_env = Environment(loader=FileSystemLoader(items_manager.THIS_DIR), trim_blocks=True)
+    ProcessedFormBonus.load_template(j2_env)
+
+    serialization_class = serialize_items(item_list, job_list, bonus_types_js, args_result.edit)
 
     if args_result.kind == 'weapons':
-        finish_processing_weapon(serialization_class, item_kinds_3, args_result, bonus_types, bonus_types_rate)
+        finish_processing_weapon(j2_env, serialization_class, item_kinds_3, args_result)
     elif args_result.kind == 'armors':
-        finish_processing_armors(serialization_class, args_result, bonus_types, bonus_types_rate)
+        finish_processing_armors(j2_env, serialization_class, args_result, bonus_types, bonus_types_rate)
 
 
 if __name__ == '__main__':

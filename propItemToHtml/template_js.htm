@@ -9,7 +9,6 @@
         <td>Niveau</td>
         <td>Bonus</td>
         <td>BonusEdit</td>
-        <td>BonusLine</td>
     </tr>
     {% for weapon in weapons %}
     <tr>
@@ -19,20 +18,7 @@
         <td>{{ weapon.job_name }}</td>
         <td>{{ weapon.real_level }}</td>
         <td>{{ weapon.bonus_serialization }}</td>
-        <td>
-        {% for i in range(nbparam) %}
-            {% if i != 0 %}
-                <br>
-            {% endif %}
-            <select id="BONUS_{{ i }}_{{ weapon.identifier }}" name="BONUS_{{ i }}_{{ weapon.identifier }}" onchange="changed_bonus('{{ weapon.identifier }}')">
-            {% for bonustype in bonustypes %}
-                <option value="{{ bonustype['DST'] }}" {% if weapon.raw_bonus[i][0] == bonustype['DST'] %} selected {% endif %}>{{ bonustype['Name'] }}</option>
-            {% endfor %}
-            </select>
-            <input id="BONUSVAL_{{ i }}_{{ weapon.identifier }}" name="BONUSVAL_{{ i }}_{{ weapon.identifier }}" type="number" value="{{ weapon.raw_bonus[i][1] }}" onchange="changed_bonus('{{ weapon.identifier }}')">
-        {% endfor %}
-        </td>
-        <td id="TXT_{{ weapon.identifier }}"></td>
+        <td>{{ weapon.bonus_form }}</td>
     </tr>
     {% endfor %}
 </table>
