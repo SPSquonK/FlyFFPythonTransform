@@ -677,6 +677,7 @@ def normalize_subgroups(group):
                 'male_identifier': part_item[0].identifier,
                 'female_identifier': part_item[1].identifier,
                 'bonus': part_item[0].bonus_serialization,
+                'raw_bonus': part_item[0].raw_bonus
             })
 
         subgroups.append(l)
@@ -716,6 +717,15 @@ def normalize_armors(j2_env, set_groups, build_bonus_form):
             return ProcessedFormBonus(identifier, bonus)
 
         for group in global_d:
+            # Build form for parts
+            for subgroups in group['subgroups']:
+                for part in subgroups:
+                    raw_bonus = part['raw_bonus'][0:2]
+                    unified_identifier = part['male_identifier'] + "__" + part['female_identifier']
+                    form_bonus = ProcessedFormBonus(unified_identifier, raw_bonus)
+                    part['bonus'] = form_bonus.template(build_bonus_form)
+
+            # Build form for set bonus
             if group['raw_bonus'][0] is None:
                 group['bonus'] = ''
             else:
@@ -724,6 +734,7 @@ def normalize_armors(j2_env, set_groups, build_bonus_form):
                     3: [convert_to_bonus(group['raw_bonus'], 3).template(build_bonus_form)],
                     4: [convert_to_bonus(group['raw_bonus'], 4).template(build_bonus_form)]
                 }
+
 
     # Template bonus
     for group in global_d:
@@ -750,7 +761,10 @@ def finish_processing_armors(j2_env, serialization, args_result, bonus_types, bo
 
     normalized_armors = normalize_armors(j2_env, set_groups, build_bonus_form)
 
-    code = j2_env.get_template('template_armors.htm').render(groups=normalized_armors, bonus_types=bonus_types)
+    print(args_result.edit)
+
+    code = j2_env.get_template('template_armors.htm').render(groups=normalized_armors, bonus_types=bonus_types,
+                                                             edit_mode=args_result.edit)
     f = open(items_manager.THIS_DIR + "armor_list.html", "w+")
     f.write(code)
     f.close()

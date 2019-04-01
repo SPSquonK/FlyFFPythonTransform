@@ -31,6 +31,22 @@
             span.small {
                 font-size: 0.7em;
             }
+
+
+            {% if edit_mode %}
+                .first_col, .bonus_col {
+                    width: 600px;
+                }
+
+                .second_col {
+                    width: 1200px;
+                }
+
+                .item_row {
+                    border: 1px black solid;
+                    border-collapse: collapse;
+                }
+            {% endif %}
         </style>
 	</head>
 	<body>
@@ -48,9 +64,9 @@
                         {% for subgroup in group['subgroups'] %}
                             <tr>
                                 <td>
-                                    <table style="width: 100%">
+                                    <table style="width: 100%" class="item_row">
                                         {% for category in subgroup %}
-                                            <tr>
+                                            <tr class="item_row">
                                                 <td class="icon_col"><img src="{{ category.male_icon }}"></td>
                                                 <td class="name_col">
                                                     <span class="small">{{ category.male_identifier }}</span>
@@ -73,5 +89,11 @@
             </tr>
         </table>
     {% endfor %}
+
+    {% if edit_mode %}
+        <textarea id="TEXT_AREA" cols="100" rows="20"></textarea>
+        <script src="jquery-3.3.1.min.js"></script>
+        <script src="editscript.js"></script>
+    {% endif %}
     </body>
 </html>
